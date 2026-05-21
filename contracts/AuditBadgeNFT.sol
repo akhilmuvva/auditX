@@ -1,25 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "./Base64.sol";
+
 /**
  * @title AuditX Smart Contract Security Badge
  * @author Muvva Akhil Yadav
  * @notice Provides fully on-chain SVG generated security badges based on audited security scores.
  * @dev Inherits standard ERC721 properties with base64 on-chain JSON metadata.
  */
-
-// Simple OpenZeppelin-compatible ERC-721 base to allow full compilation
-interface IERC721Receiver {
-    function onERC721Received(address operator, address from, uint256 tokenId, bytes calldata data) external returns (bytes4);
-}
-
-contract AuditBadgeNFT {
+contract AuditBadgeNFT is ERC721, Ownable {
     // ── ERC721 Storage & Events ───────────────────────────────────────────────
-    string public constant name = "AuditX Security Badge";
-    string public constant symbol = "AUDITX";
-    
     uint256 private _tokenIds;
-    address public owner;
     address public authorizedAgent;
 
     struct AuditMetadata {
@@ -29,25 +23,16 @@ contract AuditBadgeNFT {
         uint256 timestamp;
     }
 
-    mapping(uint256 => address) private _owners;
-    mapping(address => uint256) private _balances;
     mapping(uint256 => AuditMetadata) public tokenAuditData;
 
-    event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
     event BadgeMinted(address indexed recipient, uint256 indexed tokenId, string contractName, uint8 score, string ipfsCid);
 
-    modifier onlyOwner() {
-        require(msg.sender == owner, "Only owner allowed");
-        _;
-    }
-
     modifier onlyAgent() {
-        require(msg.sender == authorizedAgent || msg.sender == owner, "Only authorized agent allowed");
+        require(msg.sender == authorizedAgent || msg.sender == owner(), "Only authorized agent allowed");
         _;
     }
 
-    constructor() {
-        owner = msg.sender;
+    constructor() ERC721("AuditX Security Badge", "AUDITX") Ownable(msg.sender) {
         authorizedAgent = msg.sender;
     }
 
@@ -68,8 +53,7 @@ contract AuditBadgeNFT {
         _tokenIds++;
         uint256 newTokenId = _tokenIds;
 
-        _owners[newTokenId] = recipient;
-        _balances[recipient]++;
+        _mint(recipient, newTokenId);
 
         tokenAuditData[newTokenId] = AuditMetadata({
             contractName: contractName,
@@ -78,27 +62,14 @@ contract AuditBadgeNFT {
             timestamp: block.timestamp
         });
 
-        emit Transfer(address(0), recipient, newTokenId);
         emit BadgeMinted(recipient, newTokenId, contractName, severityScore, ipfsCid);
 
         return newTokenId;
     }
 
-    // ── Standard ERC721 View Utilities ─────────────────────────────────────────
-    function balanceOf(address account) external view returns (uint256) {
-        require(account != address(0), "Zero address query");
-        return _balances[account];
-    }
-
-    function ownerOf(uint256 tokenId) external view returns (address) {
-        address tokenOwner = _owners[tokenId];
-        require(tokenOwner != address(0), "Query for nonexistent token");
-        return tokenOwner;
-    }
-
     // ── On-chain Base64 Metadata Generator ─────────────────────────────────────
-    function tokenURI(uint256 tokenId) external view returns (string memory) {
-        require(_owners[tokenId] != address(0), "Query for nonexistent token");
+    function tokenURI(uint256 tokenId) public view override returns (string memory) {
+        _requireOwned(tokenId); // OZ v5 helper function
         
         AuditMetadata memory audit = tokenAuditData[tokenId];
         
@@ -136,7 +107,7 @@ contract AuditBadgeNFT {
         string memory json = string(abi.encodePacked(
             "{\"name\": \"AuditX Certificate #", _uintToString(tokenId), "\",",
             "\"description\": \"Fully decentralized on-chain security audit badge proving clean contract compliance.\",",
-            "\"image\": \"data:image/svg+xml;base64,", _base64Encode(bytes(svg)), "\",",
+            "\"image\": \"data:image/svg+xml;base64,", Base64.encode(bytes(svg)), "\",",
             "\"attributes\": [",
             "{\"trait_type\": \"Target Contract\", \"value\": \"", audit.contractName, "\"},",
             "{\"trait_type\": \"CVSS Score\", \"value\": \"", _formatScore(audit.severityScore), "\"},",
@@ -146,7 +117,7 @@ contract AuditBadgeNFT {
             "]}"
         ));
 
-        return string(abi.encodePacked("data:application/json;base64,", _base64Encode(bytes(json))));
+        return string(abi.encodePacked("data:application/json;base64,", Base64.encode(bytes(json))));
     }
 
     // ── Helper Math Functions ──────────────────────────────────────────────────
@@ -185,49 +156,5 @@ contract AuditBadgeNFT {
             }
         }
         return string(result);
-    }
-
-    // ── Pure Solidity Base64 Encoder ───────────────────────────────────────────
-    function _base64Encode(bytes memory data) internal pure returns (string memory) {
-        string memory table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-        bytes memory tableBytes = bytes(table);
-        
-        if (data.length == 0) return "";
-        
-        uint256 encodedLength = 4 * ((data.length + 2) / 3);
-        bytes memory result = new bytes(encodedLength + 32); // add buffering padding
-        
-        uint256 i = 0;
-        uint256 j = 0;
-        
-        for (; i + 3 <= data.length; i += 3) {
-            uint256 input = (uint256(uint8(data[i])) << 16) | (uint256(uint8(data[i+1])) << 8) | uint256(uint8(data[i+2]));
-            result[j++] = tableBytes[(input >> 18) & 63];
-            result[j++] = tableBytes[(input >> 12) & 63];
-            result[j++] = tableBytes[(input >> 6) & 63];
-            result[j++] = tableBytes[input & 63];
-        }
-        
-        if (data.length - i == 1) {
-            uint256 input = uint256(uint8(data[i])) << 16;
-            result[j++] = tableBytes[(input >> 18) & 63];
-            result[j++] = tableBytes[(input >> 12) & 63];
-            result[j++] = "=";
-            result[j++] = "=";
-        } else if (data.length - i == 2) {
-            uint256 input = (uint256(uint8(data[i])) << 16) | (uint256(uint8(data[i+1])) << 8);
-            result[j++] = tableBytes[(input >> 18) & 63];
-            result[j++] = tableBytes[(input >> 12) & 63];
-            result[j++] = tableBytes[(input >> 6) & 63];
-            result[j++] = "=";
-        }
-        
-        // Truncate to exact length
-        bytes memory finalResult = new bytes(j);
-        for (uint256 k = 0; k < j; k++) {
-            finalResult[k] = result[k];
-        }
-        
-        return string(finalResult);
     }
 }

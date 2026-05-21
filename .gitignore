@@ -7,3 +7,11 @@ auditx-reports/
 # OS-specific files
 .DS_Store
 Thumbs.db
+
+# Build and Cache
+artifacts/
+cache/
+dist/
+
+# Env files
+.env

@@ -1,6 +1,8 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { SimulatorReport } from '../store/constants';
 import { ShieldCheck, AlertTriangle, AlertCircle, ChevronRight, Share2 } from 'lucide-react';
+import { useSkyper } from '../hooks/useSkyper';
+import { useAnime } from '../hooks/useAnime';
 
 interface BadgeViewerProps {
   report: SimulatorReport | null;
@@ -10,6 +12,26 @@ interface BadgeViewerProps {
 export const BadgeViewer: React.FC<BadgeViewerProps> = ({ report, templateName }) => {
   const cardRef = useRef<HTMLDivElement | null>(null);
   const [tilt, setTilt] = useState({ rx: 0, ry: 0, mx: '50%', my: '50%' });
+
+  const easSkyper = useSkyper(report?.easTx || '', { duration: 1500, delay: 600 });
+  const ipfsSkyper = useSkyper(report?.ipfs || '', { duration: 1500, delay: 800 });
+
+  useEffect(() => {
+    if (report) {
+      easSkyper.startDecoding();
+      ipfsSkyper.startDecoding();
+    }
+  }, [report]);
+
+  useAnime({
+    targets: cardRef.current,
+    translateY: [50, 0],
+    opacity: [0, 1],
+    scale: [0.9, 1.03],
+    easing: 'easeOutExpo',
+    duration: 1200,
+    delay: 200
+  }, [report]);
 
   if (!report) {
     return (
@@ -263,12 +285,12 @@ export const BadgeViewer: React.FC<BadgeViewerProps> = ({ report, templateName }
           <div className="bg-black/40 border border-white/5 rounded-2xl p-5 space-y-4 font-fira">
             <div className="flex justify-between items-center text-xs">
               <span className="text-gray-500 font-bold">EAS SEAL UID:</span>
-              <code className="text-purple-400 font-bold">{report.easTx.substring(0, 12)}...{report.easTx.substring(52)}</code>
+              <code className="text-purple-400 font-bold">{easSkyper.displayedText.length > 20 ? easSkyper.displayedText.substring(0, 12) + '...' + easSkyper.displayedText.substring(easSkyper.displayedText.length - 12) : easSkyper.displayedText}</code>
             </div>
 
             <div className="flex justify-between items-center text-xs">
               <span className="text-gray-500 font-bold">IPFS METADATA:</span>
-              <code className="text-cyan-400 font-bold">{report.ipfs.substring(0, 12)}...{report.ipfs.substring(34)}</code>
+              <code className="text-cyan-400 font-bold">{ipfsSkyper.displayedText.length > 20 ? ipfsSkyper.displayedText.substring(0, 12) + '...' + ipfsSkyper.displayedText.substring(ipfsSkyper.displayedText.length - 12) : ipfsSkyper.displayedText}</code>
             </div>
 
             <div className="flex justify-between items-center text-xs">

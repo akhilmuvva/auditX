@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  auditx-engine:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - ANTHROPIC_API_KEY=\${ANTHROPIC_API_KEY}
+      - PRIVATE_KEY=\${PRIVATE_KEY}
+      - RPC_URL=\${RPC_URL}
+    volumes:
+      - ./contracts:/app/contracts
+      - ./auditx-reports:/app/auditx-reports
+    restart: unless-stopped
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: sh -c "cd dashboard && npm run dev -- --host 0.0.0.0"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./dashboard/src:/app/dashboard/src
+    environment:
+      - NODE_ENV=development
