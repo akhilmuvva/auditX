@@ -11,21 +11,32 @@ export const useAnime = (
   const animeRef = useRef<JSAnimation | null>(null);
 
   useEffect(() => {
-    const { targets, ...rest } = params;
-    animeRef.current = animate(targets as any, {
-      ...rest,
-      autoplay: playOnMount,
-    });
+    try {
+      const { targets, ...rest } = params;
+
+      // Bail out if a string selector resolves to nothing
+      if (typeof targets === 'string') {
+        const els = document.querySelectorAll(targets);
+        if (els.length === 0) return;
+      }
+
+      animeRef.current = animate(targets as any, {
+        ...rest,
+        autoplay: playOnMount,
+      });
+    } catch (e) {
+      // Silently swallow animation errors (e.g. missing DOM nodes on first render)
+    }
 
     return () => {
-      animeRef.current?.cancel();
+      try { animeRef.current?.cancel(); } catch {}
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, dependencies);
 
   return {
-    play: () => animeRef.current?.play(),
-    pause: () => animeRef.current?.pause(),
-    restart: () => animeRef.current?.restart(),
+    play: () => { try { animeRef.current?.play(); } catch {} },
+    pause: () => { try { animeRef.current?.pause(); } catch {} },
+    restart: () => { try { animeRef.current?.restart(); } catch {} },
   };
 };
