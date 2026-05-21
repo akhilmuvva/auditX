@@ -1,0 +1,2892 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AuditX — Decentralized Smart Contract Security Agent & Technology Stack</title>
+  
+  <!-- Premium Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <style>
+    /* ── DESIGN SYSTEM & CSS VARIABLES ───────────────────────────────────────── */
+    :root {
+      --bg-darker: #050508;
+      --bg-dark: #0a0b10;
+      --bg-card: rgba(16, 18, 27, 0.7);
+      --bg-card-hover: rgba(24, 27, 41, 0.95);
+      --border: rgba(255, 255, 255, 0.08);
+      --border-glow: rgba(99, 102, 241, 0.3);
+      
+      /* Neon HSL coordinates */
+      --primary-hsl: 263, 90%, 55%;     /* Indigo */
+      --secondary-hsl: 290, 100%, 60%;   /* Purple */
+      --emerald-hsl: 142, 70%, 45%;     /* Emerald (Safe) */
+      --amber-hsl: 37, 95%, 50%;        /* Amber (Medium Risk) */
+      --rose-hsl: 346, 85%, 50%;        /* Rose (Critical Risk) */
+      --info-hsl: 199, 90%, 50%;        /* Cyan */
+
+      --primary: hsl(var(--primary-hsl));
+      --secondary: hsl(var(--secondary-hsl));
+      --emerald: hsl(var(--emerald-hsl));
+      --amber: hsl(var(--amber-hsl));
+      --rose: hsl(var(--rose-hsl));
+      --info: hsl(var(--info-hsl));
+
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+
+      --glow-indigo: 0 0 20px rgba(99, 102, 241, 0.25);
+      --glow-emerald: 0 0 20px rgba(16, 185, 129, 0.25);
+      --glow-amber: 0 0 20px rgba(245, 158, 11, 0.25);
+      --glow-rose: 0 0 20px rgba(244, 63, 94, 0.25);
+
+      --font-outfit: 'Outfit', sans-serif;
+      --font-fira: 'Fira Code', monospace;
+      
+      --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* ── GLOBAL RESET & BODY ─────────────────────────────────────────────────── */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+    }
+
+    body {
+      background-color: var(--bg-darker);
+      color: var(--text-main);
+      font-family: var(--font-outfit);
+      min-height: 100vh;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* Starry Cyber background grid */
+    .cyber-bg {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -2;
+      background: 
+        radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.04) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(236, 72, 153, 0.03) 0%, transparent 45%),
+        linear-gradient(rgba(255, 255, 255, 0.003) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.003) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
+    }
+
+    .particles-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    /* Custom scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 99px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.25);
+    }
+
+    /* ── HEADER PANEL ────────────────────────────────────────────────────────── */
+    header {
+      background: linear-gradient(to bottom, rgba(5, 5, 8, 0.95), rgba(10, 11, 16, 0.8));
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+    }
+
+    .logo-badge {
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      color: #fff;
+      font-weight: 800;
+      font-size: 18px;
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+      font-family: var(--font-fira);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .logo-badge::after {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+      transform: rotate(45deg);
+      animation: shine 4s infinite linear;
+    }
+
+    @keyframes shine {
+      0% { transform: translate(-50%, -50%) rotate(45deg); }
+      100% { transform: translate(50%, 50%) rotate(45deg); }
+    }
+
+    .logo-text h1 {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      background: linear-gradient(to right, #ffffff, #818cf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .logo-text span {
+      font-size: 10px;
+      color: var(--text-dim);
+      font-family: var(--font-fira);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      display: block;
+    }
+
+    .nav-tabs {
+      display: flex;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      padding: 4px;
+      gap: 4px;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-family: var(--font-outfit);
+      font-size: 14px;
+      font-weight: 550;
+      padding: 8px 24px;
+      border-radius: 99px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: var(--transition);
+    }
+
+    .tab-btn svg {
+      width: 16px;
+      height: 16px;
+      stroke-width: 2px;
+      transition: var(--transition);
+    }
+
+    .tab-btn:hover {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .tab-btn.active {
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(236, 72, 153, 0.15));
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      color: var(--text-main);
+      box-shadow: 0 4px 20px rgba(99, 102, 241, 0.1);
+    }
+
+    .header-stats {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .stat-mini {
+      text-align: right;
+    }
+
+    .stat-mini span {
+      display: block;
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .stat-mini strong {
+      font-family: var(--font-fira);
+      font-size: 14px;
+      color: var(--primary);
+    }
+
+    /* ── LAYOUT & SHELL ──────────────────────────────────────────────────────── */
+    .app-container {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 30px 40px;
+      min-height: calc(100vh - 80px);
+    }
+
+    .view-pane {
+      display: none;
+      animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    .view-pane.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(15px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── TAB 1: ARCHITECTURE BLUEPRINT ────────────────────────────────────────── */
+    .arch-grid {
+      display: grid;
+      grid-template-columns: 3fr 1.1fr;
+      gap: 30px;
+    }
+
+    .blueprint-view {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      position: relative;
+    }
+
+    /* Segment Layers grouping */
+    .blueprint-column {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .column-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      padding-left: 8px;
+      border-left: 2px solid var(--primary);
+      margin-bottom: 4px;
+    }
+
+    .blueprint-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      backdrop-filter: blur(10px);
+      transition: var(--transition);
+    }
+
+    .blueprint-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      background: transparent;
+      transition: var(--transition);
+    }
+
+    .blueprint-card:hover {
+      background: var(--bg-card-hover);
+      border-color: rgba(99, 102, 241, 0.25);
+      transform: translateY(-4px);
+      box-shadow: var(--glow-indigo);
+    }
+
+    .blueprint-card.selected {
+      border-color: var(--primary);
+      box-shadow: var(--glow-indigo);
+    }
+
+    .blueprint-card.selected::before {
+      background: linear-gradient(to bottom, var(--primary), var(--secondary));
+    }
+
+    .blueprint-card.layer-frontend { border-left: 4px solid var(--info); }
+    .blueprint-card.layer-backend { border-left: 4px solid var(--primary); }
+    .blueprint-card.layer-security { border-left: 4px solid var(--rose); }
+    .blueprint-card.layer-storage { border-left: 4px solid var(--amber); }
+    .blueprint-card.layer-trust { border-left: 4px solid var(--emerald); }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+
+    .card-icon {
+      background: rgba(255, 255, 255, 0.04);
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--border);
+      color: var(--primary);
+      transition: var(--transition);
+    }
+
+    .blueprint-card:hover .card-icon {
+      background: rgba(99, 102, 241, 0.1);
+      border-color: rgba(99, 102, 241, 0.3);
+      color: #fff;
+    }
+
+    .card-badge {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text-dim);
+      background: rgba(255, 255, 255, 0.03);
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-family: var(--font-fira);
+      text-transform: uppercase;
+    }
+
+    .card-title h3 {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 6px;
+    }
+
+    .card-title p {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .card-tools {
+      margin-top: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .tool-tag {
+      font-size: 10px;
+      font-weight: 600;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-family: var(--font-fira);
+      transition: var(--transition);
+    }
+
+    .blueprint-card:hover .tool-tag {
+      border-color: rgba(255, 255, 255, 0.12);
+      color: var(--text-main);
+    }
+
+    /* Details Panel */
+    .details-sidebar {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 30px;
+      height: fit-content;
+      position: sticky;
+      top: 110px;
+      backdrop-filter: blur(10px);
+    }
+
+    .details-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 300px;
+      text-align: center;
+      color: var(--text-dim);
+    }
+
+    .details-placeholder svg {
+      width: 48px;
+      height: 48px;
+      stroke-width: 1.5;
+      margin-bottom: 16px;
+      color: var(--text-dim);
+      opacity: 0.5;
+    }
+
+    .details-content {
+      animation: fadeIn 0.3s ease forwards;
+    }
+
+    .details-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 20px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .details-header-icon {
+      background: rgba(99, 102, 241, 0.1);
+      width: 50px;
+      height: 50px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--primary);
+      border: 1px solid rgba(99, 102, 241, 0.2);
+    }
+
+    .details-header-title h2 {
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .details-header-title span {
+      font-size: 11px;
+      color: var(--primary);
+      font-family: var(--font-fira);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      font-weight: 600;
+    }
+
+    .details-body p {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.6;
+      margin-bottom: 20px;
+    }
+
+    .details-section {
+      margin-bottom: 20px;
+    }
+
+    .details-section h4 {
+      font-size: 12px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+      font-weight: 700;
+    }
+
+    .detail-flow {
+      background: rgba(5, 5, 8, 0.4);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      font-size: 13px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .flow-step {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-muted);
+    }
+
+    .flow-step strong {
+      color: var(--text-main);
+      font-weight: 600;
+    }
+
+    .flow-step svg {
+      width: 14px;
+      height: 14px;
+      color: var(--primary);
+      flex-shrink: 0;
+    }
+
+    .feature-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .feature-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .feature-list li svg {
+      color: var(--emerald);
+      width: 16px;
+      height: 16px;
+      stroke-width: 3px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    /* ── TAB 2: LIVE PIPELINE SIMULATOR ───────────────────────────────────────── */
+    .sim-layout {
+      display: grid;
+      grid-template-columns: 1.2fr 1.8fr;
+      gap: 30px;
+    }
+
+    /* Code Workspace (Left Side) */
+    .sim-panel-left {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .code-editor-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 520px;
+      backdrop-filter: blur(10px);
+    }
+
+    .editor-header {
+      background: rgba(5, 5, 8, 0.5);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .window-dots {
+      display: flex;
+      gap: 6px;
+    }
+
+    .window-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .window-dot:nth-child(1) { background: var(--rose); }
+    .window-dot:nth-child(2) { background: var(--amber); }
+    .window-dot:nth-child(3) { background: var(--emerald); }
+
+    .contract-select {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      font-family: var(--font-outfit);
+      font-size: 13px;
+      font-weight: 500;
+      padding: 6px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      outline: none;
+      transition: var(--transition);
+    }
+
+    .contract-select:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .editor-area {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .line-numbers {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 45px;
+      height: 100%;
+      background: rgba(5, 5, 8, 0.2);
+      border-right: 1px solid var(--border);
+      padding: 20px 0;
+      text-align: right;
+      padding-right: 12px;
+      font-family: var(--font-fira);
+      font-size: 12px;
+      color: var(--text-dim);
+      line-height: 1.6;
+      user-select: none;
+    }
+
+    .code-textarea {
+      position: absolute;
+      top: 0;
+      left: 45px;
+      width: calc(100% - 45px);
+      height: 100%;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text-main);
+      font-family: var(--font-fira);
+      font-size: 13px;
+      line-height: 1.6;
+      padding: 20px;
+      resize: none;
+      overflow-y: auto;
+      white-space: pre;
+    }
+
+    .editor-footer {
+      background: rgba(5, 5, 8, 0.5);
+      border-top: 1px solid var(--border);
+      padding: 14px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .editor-status {
+      font-family: var(--font-fira);
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .btn-audit {
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      color: #fff;
+      border: none;
+      font-family: var(--font-outfit);
+      font-size: 14px;
+      font-weight: 700;
+      padding: 10px 24px;
+      border-radius: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 4px 15px rgba(99, 102, 241, 0.35);
+      transition: var(--transition);
+    }
+
+    .btn-audit:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
+    }
+
+    .btn-audit:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    .btn-audit:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .btn-audit svg {
+      width: 16px;
+      height: 16px;
+      stroke-width: 2.5px;
+    }
+
+    /* Pipeline & Results Panel (Right Side) */
+    .sim-panel-right {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* Visual Pipeline Status Grid */
+    .pipeline-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 24px;
+      backdrop-filter: blur(10px);
+    }
+
+    .pipeline-title {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .sim-progress-indicator {
+      font-family: var(--font-fira);
+      font-size: 11px;
+      color: var(--primary);
+      background: rgba(99, 102, 241, 0.1);
+      border: 1px solid rgba(99, 102, 241, 0.2);
+      padding: 2px 8px;
+      border-radius: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .pipeline-nodes {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      position: relative;
+    }
+
+    .pipeline-node {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      position: relative;
+      z-index: 2;
+      transition: var(--transition);
+    }
+
+    .node-icon-wrapper {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.03);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-dim);
+      border: 1px solid var(--border);
+      transition: var(--transition);
+    }
+
+    .pipeline-node span {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      line-height: 1.3;
+    }
+
+    .pipeline-node p {
+      font-family: var(--font-fira);
+      font-size: 8.5px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Active / Completed states */
+    .pipeline-node.active {
+      border-color: var(--primary);
+      background: rgba(99, 102, 241, 0.05);
+      box-shadow: var(--glow-indigo);
+    }
+
+    .pipeline-node.active .node-icon-wrapper {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+
+    .pipeline-node.active span {
+      color: var(--text-main);
+    }
+
+    .pipeline-node.completed {
+      border-color: var(--emerald);
+      background: rgba(16, 185, 129, 0.03);
+    }
+
+    .pipeline-node.completed .node-icon-wrapper {
+      background: var(--emerald);
+      color: #fff;
+      border-color: var(--emerald);
+    }
+
+    .pipeline-node.completed span {
+      color: var(--text-main);
+    }
+
+    /* Connecting bars */
+    .node-connector {
+      position: absolute;
+      top: 28px;
+      left: calc(12.5% + 16px);
+      width: 75%;
+      height: 2px;
+      background: var(--border);
+      z-index: 1;
+    }
+
+    .node-connector-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(to right, var(--primary), var(--emerald));
+      box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+      transition: width 0.5s ease;
+    }
+
+    /* Live scrolling logs */
+    .terminal-card {
+      background: #030305;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 20px;
+      height: 230px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
+      box-shadow: inset 0 2px 10px rgba(0,0,0,0.8);
+      font-family: var(--font-fira);
+      font-size: 12px;
+    }
+
+    .terminal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      margin-bottom: 8px;
+      color: var(--text-dim);
+    }
+
+    .terminal-title {
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .terminal-title svg {
+      width: 14px;
+      height: 14px;
+      color: var(--emerald);
+    }
+
+    .terminal-logs {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding-right: 6px;
+      scroll-behavior: smooth;
+    }
+
+    .log-line {
+      line-height: 1.5;
+      color: var(--text-muted);
+      opacity: 0;
+      animation: logFadeIn 0.2s ease forwards;
+    }
+
+    @keyframes logFadeIn {
+      to { opacity: 1; }
+    }
+
+    .log-line.system { color: var(--primary); }
+    .log-line.success { color: var(--emerald); }
+    .log-line.warning { color: var(--amber); }
+    .log-line.error { color: var(--rose); }
+
+    /* Results Block */
+    .results-card {
+      display: none;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 24px;
+      backdrop-filter: blur(10px);
+      animation: fadeIn 0.4s ease forwards;
+    }
+
+    .results-grid {
+      display: grid;
+      grid-template-columns: 1.3fr 1.7fr;
+      gap: 24px;
+    }
+
+    /* ── 3D HOVER BADGE CARD ─────────────────────────────────────────────────── */
+    .badge-3d-container {
+      perspective: 1000px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 10px;
+    }
+
+    .badge-card {
+      width: 250px;
+      height: 350px;
+      background: linear-gradient(135deg, rgba(20, 24, 45, 0.9) 0%, rgba(10, 11, 20, 0.95) 100%);
+      border-radius: 24px;
+      border: 1px solid rgba(255,255,255,0.08);
+      position: relative;
+      transform-style: preserve-3d;
+      will-change: transform;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 24px;
+      box-shadow: 0 30px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1);
+      transition: border-color 0.5s ease;
+    }
+
+    .badge-card.safe { border-color: rgba(16, 185, 129, 0.4); box-shadow: 0 30px 60px rgba(0,0,0,0.5), 0 0 40px rgba(16, 185, 129, 0.15); }
+    .badge-card.warning { border-color: rgba(245, 158, 11, 0.4); box-shadow: 0 30px 60px rgba(0,0,0,0.5), 0 0 40px rgba(245, 158, 11, 0.15); }
+    .badge-card.danger { border-color: rgba(244, 63, 94, 0.4); box-shadow: 0 30px 60px rgba(0,0,0,0.5), 0 0 40px rgba(244, 63, 94, 0.15); }
+
+    .badge-card-glare {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border-radius: 24px;
+      background: radial-gradient(circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(255, 255, 255, 0.12) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .badge-card-stars {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border-radius: 24px;
+      background: radial-gradient(1.5px 1.5px at 15px 35px, #fff, rgba(0,0,0,0)),
+                  radial-gradient(1.5px 1.5px at 70px 180px, #fff, rgba(0,0,0,0)),
+                  radial-gradient(1px 1px at 190px 80px, #fff, rgba(0,0,0,0)),
+                  radial-gradient(2px 2px at 220px 290px, #fff, rgba(0,0,0,0));
+      opacity: 0.15;
+      z-index: 1;
+    }
+
+    .badge-card-glow {
+      position: absolute;
+      width: 160px;
+      height: 160px;
+      border-radius: 50%;
+      top: 60px;
+      left: 45px;
+      filter: blur(40px);
+      opacity: 0.25;
+      z-index: 0;
+    }
+
+    .badge-card-glow.safe { background: var(--emerald); }
+    .badge-card-glow.warning { background: var(--amber); }
+    .badge-card-glow.danger { background: var(--rose); }
+
+    .badge-header {
+      z-index: 2;
+      transform: translateZ(30px);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .badge-tag-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .badge-tag {
+      font-size: 8px;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-family: var(--font-fira);
+    }
+
+    .badge-tag.safe { background: rgba(16, 185, 129, 0.1); color: var(--emerald); border: 1px solid rgba(16, 185, 129, 0.2); }
+    .badge-tag.warning { background: rgba(245, 158, 11, 0.1); color: var(--amber); border: 1px solid rgba(245, 158, 11, 0.2); }
+    .badge-tag.danger { background: rgba(244, 63, 94, 0.1); color: var(--rose); border: 1px solid rgba(244, 63, 94, 0.2); }
+
+    .badge-content {
+      z-index: 2;
+      transform: translateZ(50px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      margin-top: 10px;
+    }
+
+    .badge-graphic {
+      width: 110px;
+      height: 110px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .badge-shield {
+      width: 100px;
+      height: 100px;
+      stroke-width: 1.5;
+      fill: none;
+      filter: drop-shadow(0 4px 10px rgba(0,0,0,0.5));
+    }
+
+    .badge-shield.safe { stroke: var(--emerald); }
+    .badge-shield.warning { stroke: var(--amber); }
+    .badge-shield.danger { stroke: var(--rose); }
+
+    .badge-inner-icon {
+      position: absolute;
+      width: 32px;
+      height: 32px;
+    }
+
+    .badge-inner-icon.safe { color: var(--emerald); }
+    .badge-inner-icon.warning { color: var(--amber); }
+    .badge-inner-icon.danger { color: var(--rose); }
+
+    .badge-label {
+      text-align: center;
+    }
+
+    .badge-label h4 {
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: -0.2px;
+      color: #fff;
+    }
+
+    .badge-label p {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-top: 2px;
+    }
+
+    .badge-footer {
+      z-index: 2;
+      transform: translateZ(30px);
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      padding-top: 12px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .badge-meta {
+      font-size: 9px;
+    }
+
+    .badge-meta span {
+      display: block;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .badge-meta strong {
+      color: var(--text-muted);
+      font-family: var(--font-fira);
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: block;
+    }
+
+    /* Report Score Box */
+    .report-details {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .report-title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 20px;
+    }
+
+    .report-title h3 {
+      font-size: 20px;
+      font-weight: 800;
+    }
+
+    .report-title p {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .score-badge {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 70px;
+      height: 70px;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+    }
+
+    .score-badge.safe { background: rgba(16, 185, 129, 0.05); border-color: rgba(16, 185, 129, 0.2); }
+    .score-badge.warning { background: rgba(245, 158, 11, 0.05); border-color: rgba(245, 158, 11, 0.2); }
+    .score-badge.danger { background: rgba(244, 63, 94, 0.05); border-color: rgba(244, 63, 94, 0.2); }
+
+    .score-num {
+      font-family: var(--font-fira);
+      font-size: 22px;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .score-num.safe { color: var(--emerald); }
+    .score-num.warning { color: var(--amber); }
+    .score-num.danger { color: var(--rose); }
+
+    .score-label {
+      font-size: 8px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 4px;
+    }
+
+    .vuln-breakdown {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .vuln-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border);
+      padding: 10px 16px;
+      border-radius: 10px;
+      font-size: 13px;
+    }
+
+    .vuln-item-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .vuln-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .vuln-dot.critical { background: var(--rose); box-shadow: 0 0 8px var(--rose); }
+    .vuln-dot.high { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+    .vuln-dot.medium { background: var(--info); box-shadow: 0 0 8px var(--info); }
+
+    .vuln-item span {
+      color: var(--text-muted);
+    }
+
+    .vuln-item strong {
+      font-family: var(--font-fira);
+      color: var(--text-main);
+    }
+
+    .attestation-link-box {
+      background: rgba(5, 5, 8, 0.3);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 16px;
+    }
+
+    .attestation-item {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+
+    .attestation-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .attestation-item span {
+      color: var(--text-dim);
+    }
+
+    .attestation-item code {
+      font-family: var(--font-fira);
+      color: var(--primary);
+    }
+
+    /* Findings Explorer Accordion */
+    .findings-explorer {
+      margin-top: 24px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 24px;
+      backdrop-filter: blur(10px);
+    }
+
+    .findings-explorer-title {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .findings-accordion {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .accordion-item {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.01);
+      transition: var(--transition);
+    }
+
+    .accordion-header {
+      padding: 14px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+      transition: var(--transition);
+    }
+
+    .accordion-header:hover {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .accordion-header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .severity-badge {
+      font-size: 9px;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-family: var(--font-fira);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .severity-badge.critical { background: rgba(244, 63, 94, 0.1); color: var(--rose); border: 1px solid rgba(244, 63, 94, 0.2); }
+    .severity-badge.high { background: rgba(245, 158, 11, 0.1); color: var(--amber); border: 1px solid rgba(245, 158, 11, 0.2); }
+    .severity-badge.medium { background: rgba(59, 130, 246, 0.1); color: var(--info); border: 1px solid rgba(59, 130, 246, 0.2); }
+
+    .accordion-title {
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .accordion-tool {
+      font-size: 10px;
+      color: var(--text-dim);
+      font-family: var(--font-fira);
+    }
+
+    .accordion-icon {
+      width: 18px;
+      height: 18px;
+      color: var(--text-dim);
+      transition: transform 0.3s ease;
+    }
+
+    .accordion-item.open .accordion-icon {
+      transform: rotate(180deg);
+      color: var(--text-main);
+    }
+
+    .accordion-body {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      background: rgba(5, 5, 8, 0.25);
+    }
+
+    .accordion-content {
+      padding: 20px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .finding-description {
+      color: var(--text-muted);
+    }
+
+    .finding-location {
+      font-family: var(--font-fira);
+      color: var(--primary);
+      font-size: 11.5px;
+      background: rgba(99, 102, 241, 0.05);
+      border: 1px solid rgba(99, 102, 241, 0.1);
+      padding: 4px 10px;
+      border-radius: 6px;
+      width: fit-content;
+    }
+
+    .code-comparison-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .code-box {
+      background: rgba(5, 5, 8, 0.6);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .code-box-header {
+      background: rgba(255, 255, 255, 0.02);
+      border-bottom: 1px solid var(--border);
+      padding: 6px 14px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-family: var(--font-fira);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .code-box-header.vuln { color: var(--rose); }
+    .code-box-header.fix { color: var(--emerald); }
+
+    .code-box pre {
+      padding: 12px 14px;
+      font-family: var(--font-fira);
+      font-size: 11.5px;
+      overflow-x: auto;
+    }
+
+    /* ── DYNAMIC CALL GRAPH CANVAS ─────────────────────────────────────────── */
+    .callgraph-section {
+      margin-top: 24px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 24px;
+      backdrop-filter: blur(10px);
+    }
+
+    .callgraph-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .callgraph-title {
+      font-size: 15px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .callgraph-canvas-wrapper {
+      background: #030305;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      height: 320px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .callgraph-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .callgraph-legend {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      background: rgba(10, 11, 16, 0.85);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      display: flex;
+      gap: 12px;
+      font-size: 9px;
+      font-family: var(--font-fira);
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend-color {
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
+    }
+
+    .legend-color.entry { background: var(--primary); }
+    .legend-color.internal { color: var(--text-dim); border: 1px solid var(--border); }
+    .legend-color.danger { background: var(--rose); }
+
+    /* ── FOOTER ──────────────────────────────────────────────────────────────── */
+    footer {
+      text-align: center;
+      padding: 40px;
+      color: var(--text-dim);
+      font-size: 12px;
+      border-top: 1px solid var(--border);
+      margin-top: 60px;
+      font-family: var(--font-fira);
+    }
+
+    footer span {
+      color: var(--primary);
+    }
+
+  </style>
+</head>
+<body>
+
+  <!-- Cybernetic Grid Backdrop -->
+  <div class="cyber-bg"></div>
+  <canvas id="particles" class="particles-canvas"></canvas>
+
+  <!-- ── HEADER PANEL ────────────────────────────────────────────────────────── -->
+  <header>
+    <div class="header-logo" onclick="switchView('blueprint')">
+      <div class="logo-badge">X</div>
+      <div class="logo-text">
+        <h1>AuditX</h1>
+        <span>Autonomous Cyber Security</span>
+      </div>
+    </div>
+
+    <div class="nav-tabs">
+      <button class="tab-btn active" id="tab-blueprint" onclick="switchView('blueprint')">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+        Tech Stack Explorer
+      </button>
+      <button class="tab-btn" id="tab-simulator" onclick="switchView('simulator')">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        Live Audit Simulator
+      </button>
+    </div>
+
+    <div class="header-stats">
+      <div class="stat-mini">
+        <span>Attestation Engine</span>
+        <strong>EAS V1 ACTIVE</strong>
+      </div>
+      <div class="stat-mini">
+        <span>P2P Compute</span>
+        <strong>BACALHAU ONLINE</strong>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── MAIN APP CONTAINER ──────────────────────────────────────────────────── -->
+  <div class="app-container">
+
+    <!-- ── VIEW 1: TECH STACK EXPLORER ──────────────────────────────────────── -->
+    <div id="view-blueprint" class="view-pane active">
+      <div class="arch-grid">
+        
+        <!-- Left Column: Layer Cards -->
+        <div class="blueprint-view">
+          
+          <!-- Column 1: Client & Wallet Interfaces -->
+          <div class="blueprint-column">
+            <div class="column-title">Client & Wallet Layers</div>
+            
+            <!-- Card 1 -->
+            <div class="blueprint-card layer-frontend" onclick="showDetails('frontend')">
+              <div class="card-header">
+                <div class="card-icon">
+                  <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+                </div>
+                <div class="card-badge">Web Widget</div>
+              </div>
+              <div class="card-title">
+                <h3>Frontend Interface</h3>
+                <p>Reactive, modular web engine presenting real-time audits and call graphs with smooth motion structures.</p>
+              </div>
+              <div class="card-tools">
+                <div class="tool-tag">React 18</div>
+                <div class="tool-tag">Vite 5</div>
+                <div class="tool-tag">Zustand</div>
+                <div class="tool-tag">TailwindCSS</div>
+              </div>
+            </div>
+
+            <!-- Card 2 -->
+            <div class="blueprint-card layer-frontend" onclick="showDetails('animation')">
+              <div class="card-header">
+                <div class="card-icon">
+                  <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"/></svg>
+                </div>
+                <div class="card-badge">UX & Render</div>
+              </div>
+              <div class="card-title">
+                <h3>Animation & Motion</h3>
+                <p>Stateful kinetic systems displaying simulated terminals, call graph nodes, and custom 3D audit badges.</p>
+              </div>
+              <div class="card-tools">
+                <div class="tool-tag">Framer Motion</div>
+                <div class="tool-tag">Three.js</div>
+                <div class="tool-tag">GSAP</div>
+                <div class="tool-tag">Skyper.js</div>
+              </div>
+            </div>
+
+            <!-- Card 3 -->
+            <div class="blueprint-card layer-frontend" onclick="showDetails('wallet')">
+              <div class="card-header">
+                <div class="card-icon">
+                  <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                </div>
+                <div class="card-badge">Web3 Auth</div>
+              </div>
+              <div class="card-title">
+                <h3>Wallet & Identity</h3>
+                <p>Decentralized gateway resolving Ethereum identities, verifying signatures, and loading wallet attestation targets.</p>
+              </div>
+              <div class="card-tools">
+                <div class="tool-tag">RainbowKit</div>
+                <div class="tool-tag">wagmi v2</div>
+                <div class="tool-tag">viem</div>
+                <div class="tool-tag">SIWE</div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Column 2: Analysis & Compute -->
+          <div class="blueprint-column">
+            <div class="column-title">Static, Symbolic & AI Layers</div>
+            
+            <!-- Card 4 -->
+            <div class="blueprint-card layer-security" onclick="showDetails('analysis')">
+              <div class="card-header">
+                <div class="card-icon">
+                  <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                </div>
+                <div class="card-badge">Static & Symbolic</div>
+              </div>
+              <div class="card-title">
+                <h3>Security Analysis Engines</h3>
+                <p>Heavy security scanners executing semantic parsing, control-flow graphs, and symbolic path solvers.</p>
+              </div>
+              <div class="card-tools">
+                <div class="tool-tag">Slither</div>
+                <div class="tool-tag">Mythril</div>
+                <div class="tool-tag">Surya</div>
+                <div class="tool-tag">solc</div>
+              </div>
+            </div>
+
+            <!-- Card 5 -->
+            <div class="blueprint-card layer-backend" onclick="showDetails('compute')">
+              <div class="card-header">
+                <div class="card-icon">
+                  <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
+                </div>
+                <div class="card-badge">P2P Compute</div>
+              </div>
+              <div class="card-title">
+                <h3>Decentralized Compute</h3>
+                <p>Isolated nodes executing Slither and Mythril within serverless Docker runtimes across a peer-to-peer relay network.</p>
+              </div>
+              <div class="card-tools">
+                <div class="tool-tag">Bacalhau</div>
+                <div class="tool-tag">Akash Net</div>
+                <div class="tool-tag">Lit Protocol</div>
+                <div class="tool-tag">Chainlink Fn</div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Column 3: Storage & Trust -->
+          <div class="blueprint-column">
+            <div class="column-title">Storage & On-chain Trust Layers</div>
+            
+            <!-- Card 6 -->
+            <div class="blueprint-card layer-storage" onclick="showDetails('storage')">
+              <div class="card-header">
+                <div class="card-icon">
+                  <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/></svg>
+                </div>
+                <div class="card-badge">P2P Storage</div>
+              </div>
+              <div class="card-title">
+                <h3>Decentralized Storage</h3>
+                <p>Robust distributed storage preserving original contracts, raw reports, and rich metadata schemas permanently.</p>
+              </div>
+              <div class="card-tools">
+                <div class="tool-tag">IPFS</div>
+                <div class="tool-tag">Filecoin</div>
+                <div class="tool-tag">Arweave</div>
+                <div class="tool-tag">Ceramic</div>
+              </div>
+            </div>
+
+            <!-- Card 7 -->
+            <div class="blueprint-card layer-trust" onclick="showDetails('trust')">
+              <div class="card-header">
+                <div class="card-icon">
+                  <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>
+                </div>
+                <div class="card-badge">On-chain Trust</div>
+              </div>
+              <div class="card-title">
+                <h3>Trust & Attestation</h3>
+                <p>On-chain attestation schemas establishing public verifiable audit proofs and minting ERC-721 security badges.</p>
+              </div>
+              <div class="card-tools">
+                <div class="tool-tag">EAS</div>
+                <div class="tool-tag">Arbitrum</div>
+                <div class="tool-tag">Base L2</div>
+                <div class="tool-tag">ERC-721</div>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+        <!-- Right Column: Contextual Detail Card -->
+        <div class="details-sidebar" id="details-panel">
+          <div class="details-placeholder" id="details-placeholder">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+            <p>Select any node component inside the interactive Tech Stack Blueprint to inspect its decentralized configuration, input-output pipelines, and architectural benefits.</p>
+          </div>
+          <div class="details-content" id="details-content" style="display: none;">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── VIEW 2: LIVE PIPELINE SIMULATOR ────────────────────────────────────── -->
+    <div id="view-simulator" class="view-pane">
+      <div class="sim-layout">
+        
+        <!-- Left Pane: Code & Triggers -->
+        <div class="sim-panel-left">
+          
+          <div class="code-editor-card">
+            <div class="editor-header">
+              <div class="window-dots">
+                <div class="window-dot"></div>
+                <div class="window-dot"></div>
+                <div class="window-dot"></div>
+              </div>
+              <select class="contract-select" id="contract-template" onchange="loadTemplate()">
+                <option value="vault">VulnerableVault.sol (Reentrancy Exploit)</option>
+                <option value="borrower">FlashLoanReceiver.sol (Logic Bypass)</option>
+                <option value="staking">SecureStaking.sol (Audit Verified)</option>
+              </select>
+            </div>
+            
+            <div class="editor-area">
+              <div class="line-numbers" id="line-numbers"></div>
+              <textarea class="code-textarea" id="code-input" spellcheck="false"></textarea>
+            </div>
+
+            <div class="editor-footer">
+              <div class="editor-status" id="editor-status">Lines: 15 · Language: Solidity 0.8.20</div>
+              <button class="btn-audit" id="btn-start-audit" onclick="runPipelineSimulation()">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                Run Secure Audit
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Right Pane: Pipeline & Results -->
+        <div class="sim-panel-right">
+          
+          <!-- Visual Pipeline Status Map -->
+          <div class="pipeline-card">
+            <div class="pipeline-title">
+              Autonomous Audit Pipeline
+              <span class="sim-progress-indicator" id="sim-indicator">IDLE</span>
+            </div>
+            
+            <div class="pipeline-nodes">
+              <!-- Connector progress line -->
+              <div class="node-connector">
+                <div class="node-connector-fill" id="connector-fill"></div>
+              </div>
+
+              <!-- Node 1 -->
+              <div class="pipeline-node" id="node-0">
+                <div class="node-icon-wrapper">
+                  <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                </div>
+                <span>1. Compile</span>
+                <p>solc</p>
+              </div>
+
+              <!-- Node 2 -->
+              <div class="pipeline-node" id="node-1">
+                <div class="node-icon-wrapper">
+                  <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                </div>
+                <span>2. Scan</span>
+                <p>slither / myth</p>
+              </div>
+
+              <!-- Node 3 -->
+              <div class="pipeline-node" id="node-2">
+                <div class="node-icon-wrapper">
+                  <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
+                </div>
+                <span>3. Consensus</span>
+                <p>AI Engine</p>
+              </div>
+
+              <!-- Node 4 -->
+              <div class="pipeline-node" id="node-3">
+                <div class="node-icon-wrapper">
+                  <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                </div>
+                <span>4. Certify</span>
+                <p>EAS + NFT</p>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Real-Time Scrolling Console logs -->
+          <div class="terminal-card">
+            <div class="terminal-header">
+              <div class="terminal-title">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                Live Agent Console Stream
+              </div>
+              <div id="terminal-latency" style="font-size: 10px;">0.00s</div>
+            </div>
+            
+            <div class="terminal-logs" id="terminal-logs">
+              <div class="log-line system">> AuditX Agent initialized. Select contract and trigger 'Run Secure Audit' to begin.</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Live Surya Call Graph Canvas -->
+      <div class="callgraph-section" id="callgraph-panel" style="display: none;">
+        <div class="callgraph-header">
+          <div class="callgraph-title">
+            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+            Surya Call Graph Inspector
+          </div>
+          <span style="font-size: 11px; color: var(--text-dim); font-family: var(--font-fira);">Dynamic access control relationships</span>
+        </div>
+        <div class="callgraph-canvas-wrapper">
+          <canvas id="callgraph-canvas" class="callgraph-canvas"></canvas>
+          <div class="callgraph-legend">
+            <div class="legend-item"><div class="legend-color entry"></div>Entry (Public/External)</div>
+            <div class="legend-item"><div class="legend-color internal"></div>Internal / Private</div>
+            <div class="legend-item"><div class="legend-color danger"></div>Vulnerable Call-path</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Results section & 3D Interactive Badge NFT -->
+      <div class="results-card" id="results-panel">
+        <div class="results-grid">
+          
+          <!-- Column 1: 3D Badge Graphic -->
+          <div class="badge-3d-container">
+            <div class="badge-card" id="badge-card">
+              <div class="badge-card-glare"></div>
+              <div class="badge-card-stars"></div>
+              <div class="badge-card-glow" id="badge-glow"></div>
+              
+              <div class="badge-header">
+                <span style="font-size: 9px; font-family: var(--font-fira); color: var(--text-muted); font-weight: 600;">AUDITX BADGE</span>
+                <div class="badge-tag" id="badge-tag">SECURED</div>
+              </div>
+
+              <div class="badge-content">
+                <div class="badge-graphic">
+                  <svg class="badge-shield" id="badge-shield" viewBox="0 0 100 100">
+                    <polygon points="50,5 90,25 90,65 50,95 10,65 10,25" />
+                  </svg>
+                  <svg class="badge-inner-icon" id="badge-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <!-- Icon path filled in script -->
+                  </svg>
+                </div>
+                <div class="badge-label">
+                  <h4 id="badge-title">EMERALD SECURITY</h4>
+                  <p id="badge-risk-text">ZERO VULNERABILITIES</p>
+                </div>
+              </div>
+
+              <div class="badge-footer">
+                <div class="badge-meta">
+                  <span>AUDIT TARGET</span>
+                  <strong id="badge-contract-name">VulnerableVault.sol</strong>
+                </div>
+                <div class="badge-meta">
+                  <span>IPFS CID</span>
+                  <strong id="badge-ipfs-cid">QmXyZ...</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Column 2: Audit Breakdown & Proofs -->
+          <div class="report-details">
+            <div>
+              <div class="report-title-row">
+                <div class="report-title">
+                  <h3 id="report-main-title">Consensus Security Assessment</h3>
+                  <p>Aggregated tool output cross-verified by Claude AI Consensus</p>
+                </div>
+                <div class="score-badge" id="report-score-badge">
+                  <span class="score-num" id="report-score">0.0</span>
+                  <span class="score-label">CVSS</span>
+                </div>
+              </div>
+
+              <div class="vuln-breakdown">
+                <div class="vuln-item">
+                  <div class="vuln-item-left">
+                    <div class="vuln-dot critical"></div>
+                    <span>Critical Severity Issues</span>
+                  </div>
+                  <strong id="count-critical">0</strong>
+                </div>
+                <div class="vuln-item">
+                  <div class="vuln-item-left">
+                    <div class="vuln-dot high"></div>
+                    <span>High Severity Issues</span>
+                  </div>
+                  <strong id="count-high">0</strong>
+                </div>
+                <div class="vuln-item">
+                  <div class="vuln-item-left">
+                    <div class="vuln-dot medium"></div>
+                    <span>Medium/Low Severity Issues</span>
+                  </div>
+                  <strong id="count-medium">0</strong>
+                </div>
+              </div>
+            </div>
+
+            <!-- Ethereum Attestation Service schema links -->
+            <div class="attestation-link-box">
+              <div class="attestation-item">
+                <span>EAS Attestation Transaction</span>
+                <code id="eas-tx">0x12a9...d4f1</code>
+              </div>
+              <div class="attestation-item">
+                <span>IPFS Report Storage CID</span>
+                <code id="ipfs-cid">QmSF...rT3z</code>
+              </div>
+              <div class="attestation-item">
+                <span>On-chain Trust Layer Registry</span>
+                <code id="network-target">Arbitrum One (L2)</code>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+        <!-- Detailed Findings Explorer -->
+        <div class="findings-explorer">
+          <div class="findings-explorer-title">
+            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            Detailed Vulnerability Assessment
+          </div>
+          <div class="findings-accordion" id="findings-accordion">
+            <!-- Populated via script -->
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- ── FOOTER ──────────────────────────────────────────────────────────────── -->
+  <footer>
+    AuditX Platform v1.2.0 • Decentralized Smart Contract Autonomous Security Audit Engine • Designed by <span>Muvva Akhil Yadav</span>
+  </footer>
+
+  <!-- ── SCRIPTS ─────────────────────────────────────────────────────────────── -->
+  <script>
+    /* ── TECH STACK DATA blue-prints ────────────────────────────────────────── */
+    const STACK_DETAILS = {
+      frontend: {
+        title: "Frontend Layer",
+        subtitle: "Component Architecture & Interface State",
+        desc: "A premium, modular client-side framework written in React 18 + Vite 5 designed to parse smart contract directories and render fully detailed dashboards.",
+        benefits: [
+          "Zero layout shifting under heavy parsing operations.",
+          "Centralized client-side audit state management using highly responsive Zustand stores.",
+          "Rapid reactive assets building utilizing Vite compile modules."
+        ],
+        steps: [
+          "Developer loads workspace directories via Vite dynamic asset bundler.",
+          "Solidity code streams live into internal state using React hooks.",
+          "Visual components structure layout with Tailwind styling classes."
+        ]
+      },
+      animation: {
+        title: "Animation & Motion",
+        subtitle: "Interactive Kinetic Presentation Systems",
+        desc: "An immersive animation pipeline that transforms static telemetry analysis data into highly engaging visual representations, micro-interactions, and reactive interfaces.",
+        benefits: [
+          "Real-time call paths tracing utilizing canvas physics engines.",
+          "3D Audit NFT Badge renders utilizing pure hardware-accelerated transforms.",
+          "Fast typewriter effects streaming Slither outputs securely through Skyper libraries."
+        ],
+        steps: [
+          "Page loads triggering staggered animations on structural cards.",
+          "Active scans trigger terminal output generation through asynchronous log stream events.",
+          "Risk scores mapped to metallic light-shifts and 3D rotation properties."
+        ]
+      },
+      wallet: {
+        title: "Wallet & Identity Layer",
+        subtitle: "Decentralized Access Gates & Address Registry",
+        desc: "Authenticates client nodes, maps Ethereum Names (ENS), signs payload hashes securely via Ethereum transactions, and sets targets for NFT mints.",
+        benefits: [
+          "Seamless Web3 wallet connect interfaces mapping all mainstream EVM providers.",
+          "Ensures cryptographically signed secure workspace checks using Sign-In with Ethereum (SIWE).",
+          "Resolves and displays custom Web3 handles via ENS records directly."
+        ],
+        steps: [
+          "Client connects wallet mapping keys to active secure session.",
+          "Attestation structures bind to client wallet directly to ensure authority.",
+          "SIWE payload verified peer-to-peer to establish trusted workspace."
+        ]
+      },
+      analysis: {
+        title: "Security Scanners Layer",
+        subtitle: "Static Parsers, Symbolic Solvers & Call Graphs",
+        desc: "The critical logic core executing multi-dimensional inspections on Solidity files. It builds complete Abstract Syntax Trees (AST) and searches for high-risk vulnerabilities.",
+        benefits: [
+          "Builds visual flow trees and maps function scopes cleanly using Surya describe commands.",
+          "Traces reentrancy vulnerabilities and access controls with Slither static parsing.",
+          "Solves difficult branch constraints and assertions utilizing Mythril Z3 solver systems."
+        ],
+        steps: [
+          "Solidity code is compiled to AST structures using solc.",
+          "Slither maps data vectors and highlights access gaps or pattern flaws.",
+          "Mythril executes symbolic paths to prove logical attack constraints."
+        ]
+      },
+      compute: {
+        title: "Decentralized Compute",
+        subtitle: "Serverless P2P Docker Scanners",
+        desc: "Executes computationally intensive security scans within sandboxed peer-to-peer nodes, removing any reliance on centralized web servers.",
+        benefits: [
+          "Zero centralized system vulnerability — compute tasks are distributed peer-to-peer.",
+          "Bacalhau processes secure jobs directly inside isolated Docker configurations on-chain.",
+          "Chainlink functions pull AI responses directly, validating consensus proof metrics."
+        ],
+        steps: [
+          "Contract code hashes are published to P2P relay networks.",
+          "Akash network clusters pull secure Docker containers containing compilers.",
+          "Scanners execute isolated checks and return structured JSON summaries."
+        ]
+      },
+      storage: {
+        title: "Decentralized Storage",
+        subtitle: "Immutable File Hashing & Relays",
+        desc: "Guarantees permanent, tamper-proof availability of smart contracts, AST properties, and raw security report audits.",
+        benefits: [
+          "Cryptographically hashed storage paths verify file integrity.",
+          "Arweave permanently archives critical data, protecting against loss.",
+          "Ceramic maintains dynamic user identities and audit metrics."
+        ],
+        steps: [
+          "Audit report bundle is generated as a structured JSON object.",
+          "IPFS splits data into blocks, generating a unique Content Identifier (CID).",
+          "Metadata schemas upload to nft.storage to prepare the NFT badge mint."
+        ]
+      },
+      trust: {
+        title: "Trust & Attestation Layer",
+        subtitle: "Ethereum Attestation Service & Badging",
+        desc: "The on-chain registry documenting audit claims, sealing severe security reports using EAS, and minting permanent visual ERC-721 badges.",
+        benefits: [
+          "Standardized attestation schemas verify audit credibility.",
+          "Minimizes transaction costs using low-fee L2 execution networks (Arbitrum/Base).",
+          "ERC-721 tokens grant visual badges directly to audited wallet interfaces."
+        ],
+        steps: [
+          "EAS registry parses CID outputs, severity scores, and targets.",
+          "L2 contract executes and returns an immutable transaction hash.",
+          "ERC-721 contract mints a dynamic security badge NFT based on score."
+        ]
+      }
+    };
+
+    /* ── SIMULATOR CONTRACT TEMPLATES ────────────────────────────────────────── */
+    const CODE_TEMPLATES = {
+      vault: `// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
+
+contract VulnerableVault {
+    mapping(address => uint256) public balances;
+
+    function deposit() external payable {
+        balances[msg.sender] += msg.value;
+    }
+
+    function withdraw() external {
+        uint256 bal = balances[msg.sender];
+        require(bal > 0, "Insufficient balance");
+
+        // VULNERABILITY: External call before state update (Reentrancy)
+        (bool success, ) = msg.sender.call{value: bal}("");
+        require(success, "Transfer failed");
+
+        balances[msg.sender] = 0;
+    }
+}`,
+      borrower: `// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
+
+contract FlashLoanReceiver {
+    address public owner;
+    address public pool;
+
+    constructor(address _pool) {
+        owner = msg.sender;
+        pool = _pool;
+    }
+
+    // VULNERABILITY: Unprotected critical callback function
+    function executeOperation(
+        address token,
+        uint256 amount,
+        uint256 fee,
+        bytes calldata params
+    ) external returns (bool) {
+        // Missing modifier to verify caller is indeed the verified pool
+        // An attacker can call this directly to bypass loan payment rules
+        
+        // Critical custom operations here...
+        return true;
+    }
+}`,
+      staking: `// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
+
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract SecureStaking is ReentrancyGuard, Ownable {
+    mapping(address => uint256) public stakedBalances;
+
+    constructor() Ownable(msg.sender) {}
+
+    function stake() external payable nonReentrant {
+        require(msg.value > 0, "Cannot stake 0");
+        stakedBalances[msg.sender] += msg.value;
+    }
+
+    function withdraw() external nonReentrant {
+        uint256 amount = stakedBalances[msg.sender];
+        require(amount > 0, "No active stakes");
+
+        // SECURE: Checks-Effects-Interactions followed perfectly
+        stakedBalances[msg.sender] = 0;
+
+        (bool success, ) = msg.sender.call{value: amount}("");
+        require(success, "Withdraw failed");
+    }
+}`
+    };
+
+    /* ── SIMULATOR OUTPUT SCHEMAS ────────────────────────────────────────────── */
+    const SIMULATOR_DATA = {
+      vault: {
+        score: "8.8",
+        status: "danger",
+        badgeTitle: "CRIMSON GUARD",
+        badgeRisk: "CRITICAL REENTRANCY EXPLOIT",
+        badgeIcon: `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>`,
+        critical: 1,
+        high: 1,
+        medium: 0,
+        ipfs: "QmSFk3tRyPzoA7Y3Z4mKkQrTeG18Uo7GjYwT2fV8P7XzY",
+        easTx: "0xa38c7f9999812ea2c7e6e5a6b0c2420f1883c84f6d4d42b91866ff31998f4df2",
+        network: "Arbitrum One (L2)",
+        findings: [
+          {
+            title: "Reentrancy Vulnerability (External Call Before Balance Cleared)",
+            severity: "critical",
+            tool: "Slither check-reentrancy",
+            loc: "VulnerableVault.sol: L13-17",
+            desc: "The contract calls 'msg.sender.call' to withdraw funds before updating the internal mapping 'balances[msg.sender] = 0'. A malicious user can write a recursive contract that calls 'withdraw()' again inside their callback, draining the entire vault balance.",
+            vulnCode: `(bool success, ) = msg.sender.call{value: bal}("");\nbalances[msg.sender] = 0;`,
+            fixCode: `balances[msg.sender] = 0;\n(bool success, ) = msg.sender.call{value: bal}("");`
+          },
+          {
+            title: "Missing Zero Check on Deposit address",
+            severity: "high",
+            tool: "Mythril SWC-105",
+            loc: "VulnerableVault.sol: L8-10",
+            desc: "Depositing addresses are not checked. Though depositors are tracked via msg.sender, raw address queries might cause state lockups if interfaces pass unverified data streams.",
+            vulnCode: `function deposit() external payable {`,
+            fixCode: `function deposit() external payable {\n    require(msg.sender != address(0), "No zero address");`
+          }
+        ],
+        graphNodes: [
+          { name: "deposit()", type: "entry", x: 100, y: 160 },
+          { name: "withdraw()", type: "danger", x: 300, y: 160 },
+          { name: "msg.sender.call", type: "danger", x: 500, y: 160 },
+        ],
+        graphEdges: [
+          { from: 0, to: 1, type: "internal" },
+          { from: 1, to: 2, type: "danger" }
+        ],
+        terminal: [
+          { type: "system", text: "Initializing solc compiler v0.8.20..." },
+          { type: "system", text: "Building AST graph models for VulnerableVault..." },
+          { type: "success", text: "AST generated successfully. Launching decentralized compute container..." },
+          { type: "system", text: "P2P Job relay: Bacalhau node initialized (IP: 147.28.112.5)." },
+          { type: "system", text: "Executing Slither static analyzer suite..." },
+          { type: "error", text: "Slither WARNING: Reentrancy found in VulnerableVault.withdraw() -> lines 13-17!" },
+          { type: "system", text: "Executing Mythril symbolic executor..." },
+          { type: "warning", text: "Mythril alert: SWC-107 Reentrancy path successfully simulated by Z3 solver." },
+          { type: "system", text: "Generating Surya Call Graph mappings..." },
+          { type: "success", text: "Call Graph mapped. Passing scanner outputs to AI Consensus layer..." },
+          { type: "system", text: "Consensus generated: Claude Sonnet scored CVSS: 8.8 (Critical)." },
+          { type: "system", text: "Compressing reports. Uploading metadata to IPFS storage network..." },
+          { type: "success", text: "IPFS Upload COMPLETE. CID: QmSFk3tRyPzoA7Y3..." },
+          { type: "system", text: "Routing proofs to Ethereum Attestation Service registry..." },
+          { type: "success", text: "EAS Attestation sealed on Arbitrum One L2. Tx: 0xa38c7f..." },
+          { type: "warning", text: "Audit Score >= 7. Badge NFT Minting bypassed due to safety alert." },
+          { type: "success", text: "Audit report completed successfully." }
+        ]
+      },
+      borrower: {
+        score: "7.5",
+        status: "warning",
+        badgeTitle: "AMBER GUARD",
+        badgeRisk: "HIGH RISK callback bypass",
+        badgeIcon: `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>`,
+        critical: 0,
+        high: 1,
+        medium: 1,
+        ipfs: "QmPK3tRyPzoA7Y3Z4mKkQrTeG18Uo7GjYwT2fV8P7XyK",
+        easTx: "0xb78c7f9999812ea2c7e6e5a6b0c2420f1883c84f6d4d42b91866ff31998f4e21",
+        network: "Base Goerli L2",
+        findings: [
+          {
+            title: "Unprotected Callback Operational Entry Point",
+            severity: "high",
+            tool: "Slither access-control",
+            loc: "FlashLoanReceiver.sol: L12-21",
+            desc: "The critical callback interface 'executeOperation()' does not verify the address calling the function. Anyone can invoke this entry point directly, tricking the contract into processing internal assets without authorization.",
+            vulnCode: `function executeOperation(...) external returns (bool) {`,
+            fixCode: `function executeOperation(...) external returns (bool) {\n    require(msg.sender == pool, "Only verified pool allowed");`
+          },
+          {
+            title: "Implicit Variable Ownership Mismatch",
+            severity: "medium",
+            tool: "Mythril SWC-101",
+            loc: "FlashLoanReceiver.sol: L8-10",
+            desc: "The owner address is successfully mapped during the constructor but not guarded dynamically in external integrations. Changes in network state might cause unintended control transfer.",
+            vulnCode: `owner = msg.sender;`,
+            fixCode: `owner = msg.sender;\n    // Ensure custom modifiers guard dynamic edits`
+          }
+        ],
+        graphNodes: [
+          { name: "constructor()", type: "entry", x: 100, y: 160 },
+          { name: "executeOperation()", type: "danger", x: 300, y: 160 },
+          { name: "Internal State", type: "danger", x: 500, y: 160 }
+        ],
+        graphEdges: [
+          { from: 0, to: 1, type: "internal" },
+          { from: 1, to: 2, type: "danger" }
+        ],
+        terminal: [
+          { type: "system", text: "Initializing solc compiler v0.8.20..." },
+          { type: "system", text: "Analyzing FlashLoanReceiver callback loops..." },
+          { type: "success", text: "Compiler workspace verified. Spinning up decentralized compute container..." },
+          { type: "system", text: "P2P Container loaded (IP: 184.28.112.5)." },
+          { type: "system", text: "Slither: Scanning functional signatures..." },
+          { type: "warning", text: "Slither ALERT: Unprotected external function executeOperation() allows access control bypass!" },
+          { type: "system", text: "Mythril: Processing symbolic solver assertions..." },
+          { type: "warning", text: "Mythril alert: SWC-112 Callback Vulnerability mapped." },
+          { type: "success", text: "Scanners complete. Requesting Claude AI analysis consensus..." },
+          { type: "system", text: "Consensus complete: Claude Sonnet scored CVSS: 7.5 (High)." },
+          { type: "system", text: "Uploading metadata schemas to IPFS..." },
+          { type: "success", text: "IPFS Complete. CID: QmPK3tRyPzoA7Y3..." },
+          { type: "system", text: "Deploying EAS Attestation schema..." },
+          { type: "success", text: "Attestation sealed on Base L2. Tx: 0xb78c7f..." },
+          { type: "warning", text: "Audit Score >= 7. Badge NFT Minting bypassed due to safety alert." },
+          { type: "success", text: "Audit report completed successfully." }
+        ]
+      },
+      staking: {
+        score: "1.2",
+        status: "safe",
+        badgeTitle: "EMERALD GUARD",
+        badgeRisk: "ZERO CRITICAL ISSUES - AUDIT SECURED",
+        badgeIcon: `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>`,
+        critical: 0,
+        high: 0,
+        medium: 0,
+        ipfs: "QmGL3tRyPzoA7Y3Z4mKkQrTeG18Uo7GjYwT2fV8P7XyW",
+        easTx: "0xc88c7f9999812ea2c7e6e5a6b0c2420f1883c84f6d4d42b91866ff31998f4f22",
+        network: "Arbitrum One (L2)",
+        findings: [
+          {
+            title: "Standard Code Optimization Recommendation",
+            severity: "medium",
+            tool: "Slither gas-optimization",
+            loc: "SecureStaking.sol: L13-16",
+            desc: "The state mapping stakedBalances reads repeatedly. Caching it locally can reduce gas usage during high staking interactions.",
+            vulnCode: `stakedBalances[msg.sender] += msg.value;`,
+            fixCode: `uint256 currentStake = stakedBalances[msg.sender];\nstakedBalances[msg.sender] = currentStake + msg.value;`
+          }
+        ],
+        graphNodes: [
+          { name: "stake()", type: "entry", x: 150, y: 100 },
+          { name: "withdraw()", type: "entry", x: 150, y: 220 },
+          { name: "nonReentrant", type: "internal", x: 350, y: 160 },
+          { name: "Balances Update", type: "internal", x: 550, y: 160 }
+        ],
+        graphEdges: [
+          { from: 0, to: 2, type: "internal" },
+          { from: 1, to: 2, type: "internal" },
+          { from: 2, to: 3, type: "internal" }
+        ],
+        terminal: [
+          { type: "system", text: "Initializing solc compiler v0.8.20..." },
+          { type: "system", text: "Processing import paths: OpenZeppelin ReentrancyGuard..." },
+          { type: "success", text: "Compilation successful. Spinning up decentralized compute container..." },
+          { type: "system", text: "P2P Container loaded (IP: 198.28.112.5)." },
+          { type: "system", text: "Slither: Scanning functional signatures..." },
+          { type: "success", text: "Slither: Zero critical vulnerabilities detected." },
+          { type: "system", text: "Mythril: Running 22 symbolic path solves..." },
+          { type: "success", text: "Mythril solver: All paths complete. Zero exploits found." },
+          { type: "system", text: "Generating Surya Mappings..." },
+          { type: "success", text: "Surya check complete: Call Graph conforms to safe checks pattern." },
+          { type: "success", text: "AI Consensus: Claude Sonnet confirmed 100% mainnet ready rating. Score: 1.2." },
+          { type: "system", text: "Uploading metadata to IPFS..." },
+          { type: "success", text: "IPFS Complete. CID: QmGL3tRyPzoA7Y3..." },
+          { type: "system", text: "Deploying EAS Attestation schema..." },
+          { type: "success", text: "Attestation sealed on Arbitrum L2. Tx: 0xc88c7f..." },
+          { type: "success", text: "Audit Score < 7. Minting Emerald Security NFT Badge to wallet..." },
+          { type: "success", text: "MINT COMPLETE. Badge Token ID: #2847 mapped successfully." },
+          { type: "success", text: "Audit complete. Safe mainnet deployment recommended." }
+        ]
+      }
+    };
+
+    /* ── ANIMATE BACKGROUND PARTICLES ───────────────────────────────────────── */
+    const canvas = document.getElementById('particles');
+    const ctx = canvas.getContext('2d');
+    let particlesArray = [];
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    class Particle {
+      constructor() {
+        this.x = Math.random() * canvas.width;
+        this.y = Math.random() * canvas.height;
+        this.size = Math.random() * 1.5 + 0.5;
+        this.speedX = Math.random() * 0.2 - 0.1;
+        this.speedY = Math.random() * 0.2 - 0.1;
+        this.opacity = Math.random() * 0.4 + 0.1;
+      }
+      update() {
+        this.x += this.speedX;
+        this.y += this.speedY;
+        if (this.x < 0 || this.x > canvas.width) this.speedX = -this.speedX;
+        if (this.y < 0 || this.y > canvas.height) this.speedY = -this.speedY;
+      }
+      draw() {
+        ctx.fillStyle = `rgba(129, 140, 248, ${this.opacity})`;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function initParticles() {
+      particlesArray = [];
+      const particleCount = Math.floor(canvas.width / 15);
+      for (let i = 0; i < particleCount; i++) {
+        particlesArray.push(new Particle());
+      }
+    }
+    initParticles();
+
+    function animateParticles() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      particlesArray.forEach(p => {
+        p.update();
+        p.draw();
+      });
+      requestAnimationFrame(animateParticles);
+    }
+    animateParticles();
+
+    /* ── DUAL VIEW CONTROLLER ───────────────────────────────────────────────── */
+    function switchView(viewName) {
+      document.querySelectorAll('.view-pane').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      
+      document.getElementById(`view-${viewName}`).classList.add('active');
+      document.getElementById(`tab-${viewName}`).classList.add('active');
+
+      if (viewName === 'simulator') {
+        loadTemplate();
+      }
+    }
+
+    /* ── INTERACTIVE ARCHITECTURE INSPECTOR ──────────────────────────────────── */
+    function showDetails(layerKey) {
+      document.querySelectorAll('.blueprint-card').forEach(c => c.classList.remove('selected'));
+      event.currentTarget.classList.add('selected');
+
+      const data = STACK_DETAILS[layerKey];
+      const placeholder = document.getElementById('details-placeholder');
+      const content = document.getElementById('details-content');
+
+      placeholder.style.display = 'none';
+      content.style.display = 'block';
+
+      // Build out lists dynamically
+      let listHTML = "";
+      data.benefits.forEach(b => {
+        listHTML += `<li>
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+          <span>${b}</span>
+        </li>`;
+      });
+
+      let flowHTML = "";
+      data.steps.forEach((s, idx) => {
+        flowHTML += `<div class="flow-step">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 5l7 7-7 7M5 5l7 7-7 7"/></svg>
+          <div><strong>Step ${idx + 1}:</strong> ${s}</div>
+        </div>`;
+      });
+
+      content.innerHTML = `
+        <div class="details-header">
+          <div class="details-header-icon">
+            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          </div>
+          <div class="details-header-title">
+            <h2>${data.title}</h2>
+            <span>${data.subtitle}</span>
+          </div>
+        </div>
+        <div class="details-body">
+          <p>${data.desc}</p>
+          <div class="details-section">
+            <h4>Decentralized Advantage</h4>
+            <ul class="feature-list">${listHTML}</ul>
+          </div>
+          <div class="details-section">
+            <h4>Data Workflow Pipeline</h4>
+            <div class="detail-flow">${flowHTML}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    /* ── CODE EDITOR LINE NUMBER BINDER ──────────────────────────────────────── */
+    const codeArea = document.getElementById('code-input');
+    const lineNumbers = document.getElementById('line-numbers');
+
+    function updateLineNumbers() {
+      const lines = codeArea.value.split('\n').length;
+      let numbersHTML = "";
+      for (let i = 1; i <= lines; i++) {
+        numbersHTML += `<div>${i}</div>`;
+      }
+      lineNumbers.innerHTML = numbersHTML;
+      document.getElementById('editor-status').innerText = `Lines: ${lines} · Language: Solidity 0.8.20`;
+    }
+
+    codeArea.addEventListener('input', updateLineNumbers);
+    codeArea.addEventListener('scroll', () => {
+      lineNumbers.scrollTop = codeArea.scrollTop;
+    });
+
+    function loadTemplate() {
+      const template = document.getElementById('contract-template').value;
+      codeArea.value = CODE_TEMPLATES[template];
+      updateLineNumbers();
+
+      // Reset Simulator visual state
+      document.getElementById('results-panel').style.display = 'none';
+      document.getElementById('callgraph-panel').style.display = 'none';
+      document.getElementById('connector-fill').style.width = '0%';
+      document.querySelectorAll('.pipeline-node').forEach(n => {
+        n.classList.remove('active', 'completed');
+      });
+      document.getElementById('sim-indicator').innerText = 'IDLE';
+      document.getElementById('sim-indicator').style.color = 'var(--primary)';
+      document.getElementById('sim-indicator').style.borderColor = 'rgba(99, 102, 241, 0.2)';
+      document.getElementById('sim-indicator').style.background = 'rgba(99, 102, 241, 0.1)';
+
+      document.getElementById('terminal-logs').innerHTML = `<div class="log-line system">> System IDLE. Select template and click 'Run Secure Audit'.</div>`;
+    }
+
+    /* ── RUN PIPELINE SIMULATION ─────────────────────────────────────────────── */
+    let logQueue = [];
+    let logTimer = null;
+
+    function runPipelineSimulation() {
+      const template = document.getElementById('contract-template').value;
+      const data = SIMULATOR_DATA[template];
+
+      // Disable button
+      const btn = document.getElementById('btn-start-audit');
+      btn.disabled = true;
+
+      // Reset state
+      document.getElementById('results-panel').style.display = 'none';
+      document.getElementById('callgraph-panel').style.display = 'none';
+      document.getElementById('connector-fill').style.width = '0%';
+      document.querySelectorAll('.pipeline-node').forEach(n => {
+        n.classList.remove('active', 'completed');
+      });
+
+      document.getElementById('sim-indicator').innerText = 'RUNNING';
+      document.getElementById('sim-indicator').style.color = 'var(--amber)';
+      document.getElementById('sim-indicator').style.borderColor = 'rgba(245, 158, 11, 0.3)';
+      document.getElementById('sim-indicator').style.background = 'rgba(245, 158, 11, 0.1)';
+
+      document.getElementById('terminal-logs').innerHTML = "";
+
+      let step = 0;
+      const totalSteps = 4;
+      const stepDuration = 2000; // 2 seconds per stage
+
+      // Core simulation pipeline loop
+      const pipelineInterval = setInterval(() => {
+        if (step > 0) {
+          document.getElementById(`node-${step-1}`).classList.remove('active');
+          document.getElementById(`node-${step-1}`).classList.add('completed');
+        }
+
+        if (step < totalSteps) {
+          document.getElementById(`node-${step}`).classList.add('active');
+          document.getElementById('connector-fill').style.width = `${(step / (totalSteps - 1)) * 100}%`;
+          
+          // Stream corresponding terminal logs for this stage
+          streamStageLogs(step, data.terminal);
+          
+          step++;
+        } else {
+          // Completed pipeline
+          clearInterval(pipelineInterval);
+          document.getElementById('node-3').classList.remove('active');
+          document.getElementById('node-3').classList.add('completed');
+          
+          document.getElementById('sim-indicator').innerText = 'COMPLETED';
+          document.getElementById('sim-indicator').style.color = 'var(--emerald)';
+          document.getElementById('sim-indicator').style.borderColor = 'rgba(16, 185, 129, 0.3)';
+          document.getElementById('sim-indicator').style.background = 'rgba(16, 185, 129, 0.1)';
+
+          btn.disabled = false;
+          
+          // Show report panel
+          revealAuditReport(data, template);
+        }
+      }, stepDuration);
+
+      // Start initial compile stage logs immediately
+      streamStageLogs(0, data.terminal);
+    }
+
+    function streamStageLogs(stageIndex, allLogs) {
+      // Mapped indices of terminal lines to pipeline phases
+      const logSlices = [
+        [0, 3], // Compiling
+        [3, 8], // Scanning (Slither/Mythril)
+        [8, 11], // Consensus AI
+        [11, 17] // Attestation & sealing
+      ];
+
+      const bounds = logSlices[stageIndex];
+      const stageLogs = allLogs.slice(bounds[0], bounds[1]);
+
+      const logContainer = document.getElementById('terminal-logs');
+      let index = 0;
+
+      function appendLog() {
+        if (index < stageLogs.length) {
+          const item = stageLogs[index];
+          const line = document.createElement('div');
+          line.className = `log-line ${item.type}`;
+          
+          // Add typewriter delay
+          logContainer.appendChild(line);
+          typewriteText(line, `> ${item.text}`, 0, () => {
+            logContainer.scrollTop = logContainer.scrollHeight;
+            index++;
+            setTimeout(appendLog, 150);
+          });
+        }
+      }
+
+      appendLog();
+    }
+
+    function typewriteText(element, text, charIndex, callback) {
+      if (charIndex < text.length) {
+        element.innerHTML += text.charAt(charIndex);
+        setTimeout(() => typewriteText(element, text, charIndex + 1, callback), 8);
+      } else {
+        if (callback) callback();
+      }
+    }
+
+    /* ── REVEAL & RENDER AUDIT REPORT ────────────────────────────────────────── */
+    function revealAuditReport(data, template) {
+      document.getElementById('results-panel').style.display = 'block';
+      document.getElementById('callgraph-panel').style.display = 'block';
+
+      // 1. Populate Core Score Metrics
+      document.getElementById('report-score').innerText = data.score;
+      document.getElementById('count-critical').innerText = data.critical;
+      document.getElementById('count-high').innerText = data.high;
+      document.getElementById('count-medium').innerText = data.medium;
+
+      const scoreBadge = document.getElementById('report-score-badge');
+      scoreBadge.className = `score-badge ${data.status}`;
+      document.getElementById('report-score').className = `score-num ${data.status}`;
+
+      // 2. Sealed Transaction Proofs
+      document.getElementById('eas-tx').innerText = data.easTx.substring(0, 8) + "..." + data.easTx.substring(56);
+      document.getElementById('ipfs-cid').innerText = data.ipfs.substring(0, 8) + "..." + data.ipfs.substring(38);
+      document.getElementById('network-target').innerText = data.network;
+
+      // 3. Render 3D Badge parameters
+      const badgeCard = document.getElementById('badge-card');
+      badgeCard.className = `badge-card ${data.status}`;
+      
+      const badgeGlow = document.getElementById('badge-glow');
+      badgeGlow.className = `badge-card-glow ${data.status}`;
+
+      const badgeTag = document.getElementById('badge-tag');
+      badgeTag.className = `badge-tag ${data.status}`;
+      badgeTag.innerText = data.status === 'safe' ? 'SECURED' : data.status === 'warning' ? 'WARNING' : 'DANGER';
+
+      const badgeShield = document.getElementById('badge-shield');
+      badgeShield.className = `badge-shield ${data.status}`;
+
+      const badgeIcon = document.getElementById('badge-icon');
+      badgeIcon.className = `badge-inner-icon ${data.status}`;
+      badgeIcon.innerHTML = data.badgeIcon;
+
+      document.getElementById('badge-title').innerText = data.badgeTitle;
+      document.getElementById('badge-risk-text').innerText = data.badgeRisk;
+      document.getElementById('badge-contract-name').innerText = template === 'vault' ? 'VulnerableVault.sol' : template === 'borrower' ? 'FlashLoanReceiver.sol' : 'SecureStaking.sol';
+      document.getElementById('badge-ipfs-cid').innerText = data.ipfs.substring(0, 10) + "...";
+
+      // 4. Render Accordion Findings
+      const accordion = document.getElementById('findings-accordion');
+      accordion.innerHTML = "";
+
+      data.findings.forEach((f, idx) => {
+        const item = document.createElement('div');
+        item.className = 'accordion-item';
+        item.innerHTML = `
+          <div class="accordion-header" onclick="toggleAccordion(this)">
+            <div class="accordion-header-left">
+              <span class="severity-badge ${f.severity}">${f.severity}</span>
+              <span class="accordion-title">${f.title}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <span class="accordion-tool">${f.tool}</span>
+              <svg class="accordion-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+            </div>
+          </div>
+          <div class="accordion-body">
+            <div class="accordion-content">
+              <div class="finding-description">${f.desc}</div>
+              <div class="finding-location">📍 ${f.loc}</div>
+              
+              <div class="code-comparison-grid">
+                <div class="code-box">
+                  <div class="code-box-header vuln">Vulnerable Code</div>
+                  <pre><code class="language-solidity">${escapeHTML(f.vulnCode)}</code></pre>
+                </div>
+                <div class="code-box">
+                  <div class="code-box-header fix">Remediation Patch</div>
+                  <pre><code class="language-solidity">${escapeHTML(f.fixCode)}</code></pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+        accordion.appendChild(item);
+      });
+
+      // 5. Render Dynamic Surya Call Graph
+      renderSuryaCallGraph(data.graphNodes, data.graphEdges);
+
+      // Scroll view down to results nicely
+      document.getElementById('results-panel').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function toggleAccordion(header) {
+      const item = header.closest('.accordion-item');
+      const body = item.querySelector('.accordion-body');
+      
+      if (item.classList.contains('open')) {
+        body.style.maxHeight = '0';
+        item.classList.remove('open');
+      } else {
+        // Close others
+        document.querySelectorAll('.accordion-item').forEach(el => {
+          el.classList.remove('open');
+          el.querySelector('.accordion-body').style.maxHeight = '0';
+        });
+        
+        body.style.maxHeight = body.scrollHeight + 'px';
+        item.classList.add('open');
+      }
+    }
+
+    function escapeHTML(str) {
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    /* ── DYNAMIC 2D CANVAS SURYA CALL GRAPH ──────────────────────────────────── */
+    let graphAnimId = null;
+
+    function renderSuryaCallGraph(nodes, edges) {
+      const graphCanvas = document.getElementById('callgraph-canvas');
+      const gctx = graphCanvas.getContext('2d');
+
+      // Adjust for high density displays
+      const dpr = window.devicePixelRatio || 1;
+      const rect = graphCanvas.getBoundingClientRect();
+      graphCanvas.width = rect.width * dpr;
+      graphCanvas.height = rect.height * dpr;
+      gctx.scale(dpr, dpr);
+
+      // Deep copy nodes to track dynamic float animations
+      const activeNodes = nodes.map(n => ({
+        ...n,
+        targetX: n.x,
+        targetY: n.y,
+        currentX: n.x - 20 + Math.random() * 40,
+        currentY: n.y - 20 + Math.random() * 40,
+        vx: (Math.random() - 0.5) * 0.5,
+        vy: (Math.random() - 0.5) * 0.5
+      }));
+
+      if (graphAnimId) cancelAnimationFrame(graphAnimId);
+
+      function drawGraphFrame() {
+        gctx.clearRect(0, 0, rect.width, rect.height);
+
+        // Draw connections / edges
+        edges.forEach(edge => {
+          const fromNode = activeNodes[edge.from];
+          const toNode = activeNodes[edge.to];
+
+          gctx.beginPath();
+          gctx.moveTo(fromNode.currentX, fromNode.currentY);
+          gctx.lineTo(toNode.currentX, toNode.currentY);
+
+          if (edge.type === 'danger') {
+            gctx.strokeStyle = 'rgba(244, 63, 94, 0.7)';
+            gctx.lineWidth = 2.5;
+            gctx.setLineDash([4, 4]);
+            // Animate dashes
+            gctx.lineDashOffset = (Date.now() / 30) % 16;
+          } else {
+            gctx.strokeStyle = 'rgba(99, 102, 241, 0.4)';
+            gctx.lineWidth = 1.5;
+            gctx.setLineDash([]);
+          }
+          gctx.stroke();
+        });
+
+        // Draw Nodes
+        activeNodes.forEach(node => {
+          // Slow floating drift vectors
+          node.currentX += node.vx;
+          node.currentY += node.vy;
+
+          // Pull back to home anchors gently
+          const dx = node.targetX - node.currentX;
+          const dy = node.targetY - node.currentY;
+          node.vx += dx * 0.005;
+          node.vy += dy * 0.005;
+
+          // Air resistance damping
+          node.vx *= 0.95;
+          node.vy *= 0.95;
+
+          // Node body
+          gctx.beginPath();
+          gctx.arc(node.currentX, node.currentY, 14, 0, Math.PI * 2);
+          
+          if (node.type === 'danger') {
+            gctx.fillStyle = 'rgba(244, 63, 94, 0.15)';
+            gctx.strokeStyle = 'rgba(244, 63, 94, 0.85)';
+            gctx.lineWidth = 2;
+          } else if (node.type === 'entry') {
+            gctx.fillStyle = 'rgba(99, 102, 241, 0.15)';
+            gctx.strokeStyle = 'rgba(99, 102, 241, 0.85)';
+            gctx.lineWidth = 2;
+          } else {
+            gctx.fillStyle = 'rgba(16, 185, 129, 0.15)';
+            gctx.strokeStyle = 'rgba(16, 185, 129, 0.85)';
+            gctx.lineWidth = 2;
+          }
+          gctx.fill();
+          gctx.stroke();
+
+          // Node inner core glowing indicator
+          gctx.beginPath();
+          gctx.arc(node.currentX, node.currentY, 4, 0, Math.PI * 2);
+          gctx.fillStyle = node.type === 'danger' ? 'var(--rose)' : node.type === 'entry' ? 'var(--primary)' : 'var(--emerald)';
+          gctx.fill();
+
+          // Text labels
+          gctx.font = `bold 10px 'Outfit', sans-serif`;
+          gctx.fillStyle = '#fff';
+          gctx.textAlign = 'center';
+          gctx.fillText(node.name, node.currentX, node.currentY - 22);
+        });
+
+        graphAnimId = requestAnimationFrame(drawGraphFrame);
+      }
+
+      drawGraphFrame();
+    }
+
+    /* ── 3D PHYSICAL CARD HOVER PHYSICS BINDER ────────────────────────────────── */
+    const card = document.getElementById('badge-card');
+
+    card.addEventListener('mousemove', (e) => {
+      const rect = card.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      // Calculate degrees relative to center point
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+      const tiltX = (centerY - y) / 10;
+      const tiltY = (x - centerX) / 10;
+
+      // Apply transform styles
+      card.style.transform = `rotateX(${tiltX}deg) rotateY(${tiltY}deg) scale(1.05)`;
+      
+      // Update custom HSL coordinates for gradient glare alignment
+      card.style.setProperty('--mouse-x', `${(x / rect.width) * 100}%`);
+      card.style.setProperty('--mouse-y', `${(y / rect.height) * 100}%`);
+    });
+
+    card.addEventListener('mouseleave', () => {
+      card.style.transform = 'rotateX(0deg) rotateY(0deg) scale(1)';
+      card.style.setProperty('--mouse-x', '50%');
+      card.style.setProperty('--mouse-y', '50%');
+    });
+
+    // Initialize with default template load on boot
+    loadTemplate();
+  </script>
+</body>
+</html>
