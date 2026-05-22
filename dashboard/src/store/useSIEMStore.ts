@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Alert } from '../../../src/siem/types';
+import type { Alert } from '../types/siem';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

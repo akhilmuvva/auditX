@@ -5,7 +5,7 @@ import {
   Activity, Zap, Eye, RefreshCw, ChevronDown, ChevronUp, Skull,
   Radio, BarChart3, Info, Play, Flame, Sliders, ShieldAlert,
 } from 'lucide-react';
-import type { Alert } from '../../../src/siem/types';
+import type { Alert, ThreatMatch } from '../types/siem';
 
 // ─── Severity helpers ─────────────────────────────────────────────────────────
 
@@ -87,7 +87,7 @@ const AlertRow: React.FC<{ alert: Alert }> = ({ alert }) => {
           {/* Threat matches */}
           {alert.event.threatMatches?.length > 0 && (
             <div className="rounded-lg bg-rose-500/10 border border-rose-500/20 p-2 space-y-1">
-              {alert.event.threatMatches.map((m, i) => (
+              {alert.event.threatMatches.map((m: ThreatMatch, i: number) => (
                 <div key={i} className="text-[10px] font-fira text-rose-300">
                   ☠ {m.feed.label} · {m.feed.category} · Score: {m.feed.riskScore}/10
                 </div>

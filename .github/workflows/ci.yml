@@ -26,6 +26,8 @@ jobs:
 
     - name: Install System Dependencies (Slither & Mythril)
       run: |
+        pip3 install --upgrade pip
+        pip3 install "setuptools<60"
         pip3 install slither-analyzer mythril
 
     - name: Install Node Dependencies

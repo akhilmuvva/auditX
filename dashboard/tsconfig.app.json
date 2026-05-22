@@ -17,7 +17,7 @@
     "baseUrl": ".",
     "ignoreDeprecations": "6.0",
     "paths": {
-      "@auditx/types": ["../types/index.ts"]
+      "@auditx/types": ["src/types/auditx.ts"]
     },
 
     /* Linting */
