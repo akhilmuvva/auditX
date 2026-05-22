@@ -7,18 +7,34 @@ on:
 
 jobs:
   deploy-4everland:
-    name: Deploy to 4EVERLAND
+    name: Build & Pin to 4EVERLAND IPFS
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger 4EVERLAND Deploy Hook
-        env:
-          FOUR_EVER_LAND_HOOK: ${{ secrets.FOUR_EVER_LAND_WEBHOOK_URL }}
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Project Root Dependencies
+        run: npm ci
+
+      - name: Install Dashboard Dependencies
         run: |
-          if [ -z "$FOUR_EVER_LAND_HOOK" ]; then
-            echo "❌ Error: FOUR_EVER_LAND_WEBHOOK_URL secret is not configured in GitHub Repository secrets."
-            echo "Please go to Settings -> Secrets and variables -> Actions and add your 4EVERLAND Deploy Hook URL."
-            exit 1
-          fi
-          echo "🚀 Triggering automated 4EVERLAND decentralized compilation & deployment..."
-          curl -s -X POST "$FOUR_EVER_LAND_HOOK"
-          echo -e "\n✅ Webhook successfully triggered! Check your 4EVERLAND hosting dashboard to monitor the build."
+          cd dashboard
+          npm ci
+
+      - name: Build Static Dashboard
+        run: |
+          cd dashboard
+          npm run build
+
+      - name: Pin to 4EVERLAND IPFS
+        uses: 4everland/pin-action@main
+        with:
+          EVER_TOKEN: ${{ secrets.EVER_TOKEN }}
+          EVER_PROJECT_NAME: 'auditx'
+          path: 'dashboard/dist'
