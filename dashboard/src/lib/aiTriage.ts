@@ -74,7 +74,7 @@ JSON Schema to return:
   "graphInsights": {
     "suryaCallGraphTopology": "string (Textual summary of the call graph architecture)",
     "attackSurfacePerimeter": "string (Analysis of public/external entry points)",
-    "mermaidGraph": "string (A valid Mermaid.js graph code e.g. 'graph TD\\n A-->B' representing the contract's topological function call graph. Keep it clean and visually professional. No markdown code blocks like ```mermaid just the raw syntax.)"
+    "mermaidGraph": "string (A valid Mermaid.js graph code e.g. 'graph TD\\\\n A-->B' representing the contract's topological function call graph. Keep it clean and visually professional. No markdown code blocks like [mermaid] just the raw syntax.)"
   },
   "vulnerabilities": [
     {
