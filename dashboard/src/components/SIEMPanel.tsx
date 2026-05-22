@@ -3,7 +3,7 @@ import { useSIEMStore } from '../store/useSIEMStore';
 import {
   Shield, Wifi, WifiOff, AlertTriangle, CheckCircle2,
   Activity, Zap, Eye, RefreshCw, ChevronDown, ChevronUp, Skull,
-  Radio, BarChart3, Info,
+  Radio, BarChart3, Info, Play, Flame, Sliders, ShieldAlert,
 } from 'lucide-react';
 import type { Alert } from '../../../src/siem/types';
 
@@ -230,7 +230,7 @@ const ConnectPill: React.FC = () => {
 export const SIEMPanel: React.FC = () => {
   const {
     wsStatus, alerts, baseline, eventCount, anomalyCount, threatCount,
-    clearResolved,
+    clearResolved, ingestEvents,
   } = useSIEMStore();
 
   const [filter, setFilter] = useState<'ALL' | 'OPEN' | 'CRITICAL' | 'HIGH'>('ALL');
@@ -240,6 +240,138 @@ export const SIEMPanel: React.FC = () => {
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
   }, [alerts.length]);
+
+  const handleSimulate = (scenario: string) => {
+    const txHash = '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+    const contractAddress = '0x0d3e6919bc0195155f84d0b138e078dbb4aa9818';
+    const timestamp = Date.now();
+    const blockNumber = Math.floor(Math.random() * 100000) + 12000000;
+
+    const events: any[] = [];
+
+    switch (scenario) {
+      case 'baseline':
+        // Generate 10 standard transfers to populate baseline
+        for (let i = 0; i < 10; i++) {
+          events.push({
+            id: `${txHash}-${i}`,
+            timestamp: timestamp - i * 1000,
+            chainId: 84532,
+            contractAddress,
+            txHash,
+            blockNumber,
+            eventName: 'Transfer',
+            args: {
+              from: '0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc',
+              to: '0x90f79bf6eb2c4f870365e785982e1f101e93b906',
+              value: (Math.floor(Math.random() * 500000000000000) + 10000000000000).toString(),
+            },
+            gasUsed: Math.floor(60000 + Math.random() * 10000),
+            callValue: '0',
+            from: '0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc',
+          });
+        }
+        break;
+      case 'reentrancy':
+        events.push({
+          id: `${txHash}-0`,
+          timestamp,
+          chainId: 84532,
+          contractAddress,
+          txHash,
+          blockNumber,
+          eventName: 'Withdrawal',
+          args: {
+            src: '0x70997970c51812dc3a010c7d01b50e0d17dc79c8',
+            amount: '15000000000000000000',
+          },
+          gasUsed: 310000, // Very high gas withdrawal
+          callValue: '15000000000000000000', // 15 ETH
+          from: '0x70997970c51812dc3a010c7d01b50e0d17dc79c8',
+        });
+        break;
+      case 'flashloan':
+        events.push({
+          id: `${txHash}-0`,
+          timestamp,
+          chainId: 84532,
+          contractAddress,
+          txHash,
+          blockNumber,
+          eventName: 'Swap',
+          args: {
+            sender: '0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc',
+            recipient: '0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc', // circular swap
+          },
+          gasUsed: 890000, // Massive gas
+          callValue: '0',
+          from: '0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc',
+        });
+        break;
+      case 'threat_intel':
+        events.push({
+          id: `${txHash}-0`,
+          timestamp,
+          chainId: 84532,
+          contractAddress,
+          txHash,
+          blockNumber,
+          eventName: 'Transfer',
+          args: {
+            from: '0x098b716b8aaf21512996dc57eb0615e2383e2f96', // Ronin Bridge Exploiter
+            to: '0x70997970c51812dc3a010c7d01b50e0d17dc79c8',
+            value: '500000000000000000000',
+          },
+          gasUsed: 65000,
+          callValue: '0',
+          from: '0x098b716b8aaf21512996dc57eb0615e2383e2f96',
+        });
+        break;
+      case 'governance':
+        events.push({
+          id: `${txHash}-0`,
+          timestamp,
+          chainId: 84532,
+          contractAddress,
+          txHash,
+          blockNumber,
+          eventName: 'ProposalExecuted',
+          args: {
+            proposalId: '42',
+            delay: 0,
+            emergency: true,
+          },
+          gasUsed: 220000,
+          callValue: '0',
+          from: '0x90f79bf6eb2c4f870365e785982e1f101e93b906',
+        });
+        break;
+      case 'selfdestruct':
+        events.push({
+          id: `${txHash}-0`,
+          timestamp,
+          chainId: 84532,
+          contractAddress,
+          txHash,
+          blockNumber,
+          eventName: 'EmergencyShutdown',
+          args: {
+            authorizedBy: '0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc',
+            remainingBalance: '120000000000000000000',
+          },
+          gasUsed: 140000,
+          callValue: '0',
+          from: '0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc',
+        });
+        break;
+      default:
+        break;
+    }
+
+    if (events.length > 0) {
+      ingestEvents(events);
+    }
+  };
 
   const filtered = alerts.filter((a) => {
     if (filter === 'OPEN')     return a.status === 'OPEN';
@@ -289,68 +421,186 @@ export const SIEMPanel: React.FC = () => {
         </div>
       )}
 
-      {/* ── Alert list ── */}
-      <div className="rounded-xl border border-white/8 bg-white/[0.02] overflow-hidden">
-        {/* Filter tabs */}
-        <div className="flex items-center justify-between border-b border-white/5 px-4 py-2">
-          <div className="flex gap-1">
-            {(['ALL', 'OPEN', 'CRITICAL', 'HIGH'] as const).map((f) => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={`text-[10px] font-fira font-bold px-3 py-1 rounded-lg transition-colors ${
-                  filter === f
-                    ? 'bg-indigo-500/20 border border-indigo-500/30 text-indigo-300'
-                    : 'text-gray-500 hover:text-gray-300'
-                }`}
-              >
-                {f}
-              </button>
+      {/* ── Alert list & Simulation Grid ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Left: Alert list (8 cols) */}
+        <div className="lg:col-span-8 rounded-xl border border-white/8 bg-white/[0.02] overflow-hidden flex flex-col">
+          {/* Filter tabs */}
+          <div className="flex items-center justify-between border-b border-white/5 px-4 py-2">
+            <div className="flex gap-1">
+              {(['ALL', 'OPEN', 'CRITICAL', 'HIGH'] as const).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setFilter(f)}
+                  className={`text-[10px] font-fira font-bold px-3 py-1 rounded-lg transition-colors ${
+                    filter === f
+                      ? 'bg-indigo-500/20 border border-indigo-500/30 text-indigo-300'
+                      : 'text-gray-500 hover:text-gray-300'
+                  }`}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={clearResolved}
+              className="flex items-center gap-1.5 text-[10px] font-fira text-gray-600 hover:text-gray-400 transition-colors"
+            >
+              <RefreshCw className="w-3 h-3" /> Clear resolved
+            </button>
+          </div>
+
+          {/* Alert scroll area */}
+          <div ref={scrollRef} className="max-h-[480px] overflow-y-auto p-3 space-y-2 flex-1">
+            {wsStatus === 'disconnected' && (
+              <div className="text-center py-12 space-y-3">
+                <WifiOff className="w-8 h-8 text-gray-700 mx-auto" />
+                <p className="text-sm text-gray-600 font-outfit">Not connected to SIEM server</p>
+                <p className="text-[11px] text-gray-700 font-fira">
+                  Start the server with <code className="bg-white/5 px-1.5 py-0.5 rounded">npm run dev</code> then click Connect
+                </p>
+              </div>
+            )}
+
+            {wsStatus === 'connected' && filtered.length === 0 && (
+              <div className="text-center py-12 space-y-3">
+                <CheckCircle2 className="w-8 h-8 text-emerald-500/40 mx-auto" />
+                <p className="text-sm text-gray-500 font-outfit">No alerts · All clear</p>
+                <p className="text-[11px] text-gray-700 font-fira">
+                  Monitoring {eventCount} events processed
+                </p>
+              </div>
+            )}
+
+            {filtered.map((alert) => (
+              <AlertRow key={alert.id} alert={alert} />
             ))}
           </div>
-          <button
-            onClick={clearResolved}
-            className="flex items-center gap-1.5 text-[10px] font-fira text-gray-600 hover:text-gray-400 transition-colors"
-          >
-            <RefreshCw className="w-3 h-3" /> Clear resolved
-          </button>
+
+          {/* Footer */}
+          <div className="border-t border-white/5 px-4 py-2 flex items-center justify-between">
+            <span className="text-[10px] font-fira text-gray-700">
+              {filtered.length} of {alerts.length} alerts shown
+            </span>
+            <span className="text-[10px] font-fira text-gray-700">
+              {baseline ? `Baseline n=${baseline.gasUsed.n} (${baseline.syntheticSamples} synthetic)` : 'Baseline loading…'}
+            </span>
+          </div>
         </div>
 
-        {/* Alert scroll area */}
-        <div ref={scrollRef} className="max-h-[480px] overflow-y-auto p-3 space-y-2">
-          {wsStatus === 'disconnected' && (
-            <div className="text-center py-12 space-y-3">
-              <WifiOff className="w-8 h-8 text-gray-700 mx-auto" />
-              <p className="text-sm text-gray-600 font-outfit">Not connected to SIEM server</p>
-              <p className="text-[11px] text-gray-700 font-fira">
-                Start the server with <code className="bg-white/5 px-1.5 py-0.5 rounded">npm run dev</code> then click Connect
+        {/* Right: Simulation Deck (4 cols) */}
+        <div className="lg:col-span-4 space-y-4">
+          <div className="rounded-xl border border-white/8 bg-white/[0.02] p-4 space-y-4">
+            <div>
+              <h3 className="text-xs font-bold text-gray-200 font-outfit uppercase tracking-wider flex items-center gap-1.5">
+                <Sliders className="w-3.5 h-3.5 text-indigo-400" />
+                Interactive Simulation
+              </h3>
+              <p className="text-[10px] text-gray-500 font-fira mt-0.5">
+                Inject custom on-chain scenarios via live WebSockets connection
               </p>
             </div>
-          )}
 
-          {wsStatus === 'connected' && filtered.length === 0 && (
-            <div className="text-center py-12 space-y-3">
-              <CheckCircle2 className="w-8 h-8 text-emerald-500/40 mx-auto" />
-              <p className="text-sm text-gray-500 font-outfit">No alerts · All clear</p>
-              <p className="text-[11px] text-gray-700 font-fira">
-                Monitoring {eventCount} events processed
-              </p>
+            <div className="space-y-2">
+              <button
+                onClick={() => handleSimulate('baseline')}
+                disabled={wsStatus !== 'connected'}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.04] disabled:opacity-40 disabled:pointer-events-none hover:border-indigo-500/20 transition-all duration-300 text-left"
+              >
+                <div className="w-7 h-7 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center flex-shrink-0">
+                  <Play className="w-3.5 h-3.5 fill-current" />
+                </div>
+                <div>
+                  <p className="text-[11px] font-bold text-gray-200 font-outfit">Standard Traffic Baseline</p>
+                  <p className="text-[9px] text-gray-500 font-fira">Injects 10 ERC-20 transfers to set baseline</p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => handleSimulate('reentrancy')}
+                disabled={wsStatus !== 'connected'}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.04] disabled:opacity-40 disabled:pointer-events-none hover:border-amber-500/20 transition-all duration-300 text-left"
+              >
+                <div className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center flex-shrink-0">
+                  <Flame className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <p className="text-[11px] font-bold text-gray-200 font-outfit">Reentrancy Attack</p>
+                  <p className="text-[9px] text-gray-500 font-fira">High-gas, high-value withdrawal anomaly</p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => handleSimulate('flashloan')}
+                disabled={wsStatus !== 'connected'}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.04] disabled:opacity-40 disabled:pointer-events-none hover:border-purple-500/20 transition-all duration-300 text-left"
+              >
+                <div className="w-7 h-7 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center flex-shrink-0">
+                  <Zap className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <p className="text-[11px] font-bold text-gray-200 font-outfit">Flash Loan Swap</p>
+                  <p className="text-[9px] text-gray-500 font-fira">Circular swap arbitrage signature</p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => handleSimulate('threat_intel')}
+                disabled={wsStatus !== 'connected'}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.04] disabled:opacity-40 disabled:pointer-events-none hover:border-rose-500/20 transition-all duration-300 text-left"
+              >
+                <div className="w-7 h-7 rounded-lg bg-rose-500/10 text-rose-400 flex items-center justify-center flex-shrink-0">
+                  <Skull className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <p className="text-[11px] font-bold text-gray-200 font-outfit">Lazarus Group Intrusion</p>
+                  <p className="text-[9px] text-gray-500 font-fira">Tx originating from known bridge exploiter</p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => handleSimulate('governance')}
+                disabled={wsStatus !== 'connected'}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.04] disabled:opacity-40 disabled:pointer-events-none hover:border-indigo-500/20 transition-all duration-300 text-left"
+              >
+                <div className="w-7 h-7 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center flex-shrink-0">
+                  <ShieldAlert className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <p className="text-[11px] font-bold text-gray-200 font-outfit">Timelock Bypass Attack</p>
+                  <p className="text-[9px] text-gray-500 font-fira">Governance proposal with zero delay</p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => handleSimulate('selfdestruct')}
+                disabled={wsStatus !== 'connected'}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.04] disabled:opacity-40 disabled:pointer-events-none hover:border-rose-500/20 transition-all duration-300 text-left"
+              >
+                <div className="w-7 h-7 rounded-lg bg-rose-500/10 text-rose-400 flex items-center justify-center flex-shrink-0">
+                  <Skull className="w-3.5 h-3.5 animate-pulse" />
+                </div>
+                <div>
+                  <p className="text-[11px] font-bold text-gray-200 font-outfit">Emergency Self-Destruct</p>
+                  <p className="text-[9px] text-gray-500 font-fira">Critical contract suicide invocation</p>
+                </div>
+              </button>
             </div>
-          )}
+          </div>
 
-          {filtered.map((alert) => (
-            <AlertRow key={alert.id} alert={alert} />
-          ))}
-        </div>
-
-        {/* Footer */}
-        <div className="border-t border-white/5 px-4 py-2 flex items-center justify-between">
-          <span className="text-[10px] font-fira text-gray-700">
-            {filtered.length} of {alerts.length} alerts shown
-          </span>
-          <span className="text-[10px] font-fira text-gray-700">
-            {baseline ? `Baseline n=${baseline.gasUsed.n} (${baseline.syntheticSamples} synthetic)` : 'Baseline loading…'}
-          </span>
+          <div className="rounded-xl border border-white/8 bg-white/[0.02] p-4">
+            <h3 className="text-xs font-bold text-gray-200 font-outfit uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <Shield className="w-3.5 h-3.5 text-indigo-400" />
+              Active SIEM Rule Enforcers
+            </h3>
+            <div className="text-[9px] font-fira text-gray-500 space-y-1">
+              <div className="flex justify-between border-b border-white/5 pb-1"><span>T1: Reentrancy Monitor</span><span className="text-emerald-400 font-bold">ACTIVE</span></div>
+              <div className="flex justify-between border-b border-white/5 pb-1"><span>T2: Timelock Bypass Heuristic</span><span className="text-emerald-400 font-bold">ACTIVE</span></div>
+              <div className="flex justify-between border-b border-white/5 pb-1"><span>T3: MEV Arbitrage Loop Detector</span><span className="text-emerald-400 font-bold">ACTIVE</span></div>
+              <div className="flex justify-between border-b border-white/5 pb-1"><span>T4: Known Attacker Feed</span><span className="text-emerald-400 font-bold">6 BLOCKED</span></div>
+              <div className="flex justify-between"><span>T5: Welford Anomaly Score</span><span className="text-emerald-400 font-bold">ACTIVE</span></div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -29,6 +29,7 @@ interface SIEMStore {
   acknowledge: (alertId: string) => void;
   resolve: (alertId: string) => void;
   clearResolved: () => void;
+  ingestEvents: (events: any[]) => void;
 }
 
 // ─── Default WS URL ───────────────────────────────────────────────────────────
@@ -118,5 +119,12 @@ export const useSIEMStore = create<SIEMStore>((set, get) => ({
 
   clearResolved: () => {
     set((s) => ({ alerts: s.alerts.filter((a) => a.status !== 'RESOLVED') }));
+  },
+
+  ingestEvents: (events) => {
+    const ws = get().ws;
+    if (ws?.readyState === 1) {
+      ws.send(JSON.stringify({ type: 'ingest', events }));
+    }
   },
 }));

@@ -23,6 +23,57 @@ interface ClassifyRule {
 }
 
 const RULES: ClassifyRule[] = [
+  // ── Governance Speedrun Heuristic ───────────────────────────────────────
+  {
+    category: 'GOVERNANCE',
+    severity: 'HIGH',
+    match(e) {
+      const n = e.eventName.toLowerCase();
+      if (
+        (n.includes('proposalexecuted') || n.includes('ruleexecuted')) &&
+        (e.args['delay'] === 0 || e.args['delay'] === '0' || e.args['emergency'] === true || e.args['speedrun'] === true)
+      ) {
+        return `Governance speedrun detected: instant execution event "${e.eventName}" with 0 delay`;
+      }
+      return null;
+    },
+  },
+
+  // ── MEV / Sandwich Heuristic ─────────────────────────────────────────────
+  {
+    category: 'FLASH_LOAN',
+    severity: 'MEDIUM',
+    match(e) {
+      const n = e.eventName.toLowerCase();
+      if (
+        (n.includes('swap') || n.includes('arbitrage')) &&
+        e.args['sender'] !== undefined &&
+        e.args['sender'] === e.args['recipient']
+      ) {
+        return `Circular swap detected: sender "${e.args['sender']}" matches recipient (possible sandwich/arbitrage)`;
+      }
+      return null;
+    },
+  },
+
+  // ── Emergency Shutdown / Selfdestruct Heuristic ──────────────────────────
+  {
+    category: 'UPGRADE',
+    severity: 'CRITICAL',
+    match(e) {
+      const n = e.eventName.toLowerCase();
+      if (
+        n.includes('selfdestruct') ||
+        n.includes('suicide') ||
+        n.includes('killcontract') ||
+        n.includes('emergencyshutdown')
+      ) {
+        return `Emergency contract destruction signature "${e.eventName}" detected`;
+      }
+      return null;
+    },
+  },
+
   // ── Flash Loan ──────────────────────────────────────────────────────────
   {
     category: 'FLASH_LOAN',

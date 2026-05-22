@@ -70,6 +70,32 @@ describe('EventClassifier', () => {
     expect(result.ruleSeverity).toBe('MEDIUM');
   });
 
+  it('classifies ProposalExecuted with 0 delay as GOVERNANCE / HIGH', () => {
+    const result = classifier.classify(makeEvent({
+      eventName: 'ProposalExecuted',
+      args: { delay: 0 },
+    }));
+    expect(result.category).toBe('GOVERNANCE');
+    expect(result.ruleSeverity).toBe('HIGH');
+  });
+
+  it('classifies Swap with identical sender and recipient as FLASH_LOAN / MEDIUM', () => {
+    const result = classifier.classify(makeEvent({
+      eventName: 'Swap',
+      args: { sender: '0xuser', recipient: '0xuser' },
+    }));
+    expect(result.category).toBe('FLASH_LOAN');
+    expect(result.ruleSeverity).toBe('MEDIUM');
+  });
+
+  it('classifies EmergencyShutdown as UPGRADE / CRITICAL', () => {
+    const result = classifier.classify(makeEvent({
+      eventName: 'EmergencyShutdown',
+    }));
+    expect(result.category).toBe('UPGRADE');
+    expect(result.ruleSeverity).toBe('CRITICAL');
+  });
+
   it('classifies unknown event as UNKNOWN / INFO', () => {
     const result = classifier.classify(makeEvent({ eventName: 'SomethingRandom123' }));
     expect(result.category).toBe('UNKNOWN');
