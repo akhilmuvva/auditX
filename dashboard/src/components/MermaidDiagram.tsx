@@ -32,7 +32,8 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart }) => {
       containerRef.current.innerHTML = '';
       
       try {
-        mermaid.render('mermaid-graph-' + Date.now(), chart).then(({ svg }) => {
+        const formattedChart = chart.replace(/\\n/g, '\n');
+        mermaid.render('mermaid-graph-' + Date.now(), formattedChart).then(({ svg }) => {
           if (containerRef.current) {
             containerRef.current.innerHTML = svg;
           }

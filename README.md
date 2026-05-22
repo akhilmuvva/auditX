@@ -103,6 +103,10 @@ Every execution generates a dedicated timestamped folder inside `auditx-reports/
 * **`audit-report.md`**: A clean, readable markdown report summarizing the findings.
 * **`audit-report.json`**: Highly detailed, structured machine-readable findings mapping locations and recommendations.
 
+### Dashboard Preview
+
+![AuditX Dashboard](/docs/assets/dashboard_real.png)
+
 ---
 
 ## 🛡️ Smart Contracts (`contracts/`)

@@ -2,8 +2,9 @@ import fs from 'fs';
 import { emitStep } from '../events.js';
 import { writeIncrementalReport, delay } from '../utils/helpers.js';
 import fetch from 'node-fetch';
+import { ZKCheckResult } from '../analysis/zkChecks.js';
 
-export async function runAIAnalysis(findings: any[], contractFiles: string[], reportDir: string) {
+export async function runAIAnalysis(findings: any[], contractFiles: string[], reportDir: string, zkResults: ZKCheckResult[] = []) {
   emitStep('ai-triage', 'active', { message: `Packaging heuristics for AI Triage (Claude Sonnet)...` });
 
   const API_KEY = process.env.ANTHROPIC_API_KEY;
@@ -28,6 +29,8 @@ export async function runAIAnalysis(findings: any[], contractFiles: string[], re
     {
       "summary": "High level summary",
       "riskLevel": "critical|high|medium|low|safe",
+      "cvssScore": 0.0,
+      "zkSummary": "Summary of ZK checks",
       "detailedFindings": [
         {
           "severity": "high",
@@ -43,6 +46,9 @@ export async function runAIAnalysis(findings: any[], contractFiles: string[], re
 
     Raw Findings:
     ${JSON.stringify(findings, null, 2).substring(0, 5000)}
+
+    ZK Check Results (Each failed ZK check MUST add +1.5 to the final CVSS score):
+    ${JSON.stringify(zkResults, null, 2)}
 
     Source Code:
     ${contractSource.substring(0, 10000)}
@@ -87,7 +93,7 @@ export async function runAIAnalysis(findings: any[], contractFiles: string[], re
       const cleanJson = rawText.substring(jsonStart, jsonEnd + 1);
       const result = JSON.parse(cleanJson);
       
-      emitStep('ai-triage', 'complete', { message: `AI Triage complete. Assessed Risk: ${result.riskLevel.toUpperCase()}` });
+      emitStep('ai-triage', 'complete', { message: `AI Triage complete. Assessed Risk: ${result.riskLevel.toUpperCase()}, CVSS: ${result.cvssScore}` });
       writeIncrementalReport(reportDir, { aiAnalysis: result });
       return result;
 
@@ -96,7 +102,7 @@ export async function runAIAnalysis(findings: any[], contractFiles: string[], re
       if (attempt >= maxRetries) {
         emitStep('ai-triage', 'error', { message: `Max retries reached for AI Triage. Falling back to raw findings.` });
         writeIncrementalReport(reportDir, { aiAnalysisError: error.message });
-        return { summary: "AI Triage Failed", riskLevel: "unknown", detailedFindings: [] };
+        return { summary: "AI Triage Failed", riskLevel: "unknown", cvssScore: 0.0, detailedFindings: [] };
       }
       emitStep('ai-triage', 'active', { message: `Retrying in ${backoffDelay}ms...` });
       await delay(backoffDelay);

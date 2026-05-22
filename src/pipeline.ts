@@ -3,8 +3,8 @@ import path from 'path';
 import fs from 'fs';
 import { emitStep, emitProgress } from './events.js';
 import { runSlither } from './runners/slither.js';
-import { runMythril } from './runners/mythril.js';
 import { runSurya } from './runners/surya.js';
+import { runZKChecks } from './analysis/zkChecks.js';
 import { runAIAnalysis } from './runners/ai.js';
 import { ipfsUpload, easAttest, badgeMint } from './runners/onchain.js';
 
@@ -37,11 +37,15 @@ export async function runPipeline(targetFile: string, opts: PipelineOptions = {}
   // 3. Surya Call-Graph
   const suryaData = await runSurya([targetFile], reportDir);
 
+  // 3.5 ZK Checks
+  const zkResults = runZKChecks(targetFile);
+  const zkChecksPassed = zkResults.length === 5 && zkResults.every(r => r.passed);
+
   // 4. AI Triage
-  let finalReport: any = { findings: slitherFindings.concat(mythrilFindings), suryaData };
+  let finalReport: any = { findings: slitherFindings.concat(mythrilFindings), suryaData, zkResults };
   if (opts.ai !== false) {
-    const aiResult = await runAIAnalysis(finalReport.findings, [targetFile], reportDir);
-    finalReport = { ...aiResult, suryaData };
+    const aiResult = await runAIAnalysis(finalReport.findings, [targetFile], reportDir, zkResults);
+    finalReport = { ...aiResult, suryaData, zkResults };
   }
 
   // 5. On-chain (optional)
@@ -53,29 +57,33 @@ export async function runPipeline(targetFile: string, opts: PipelineOptions = {}
     ipfsCid = await ipfsUpload(finalReport, reportDir);
   }
 
-  const score = finalReport.riskLevel === 'critical' ? '9.5'
-    : finalReport.riskLevel === 'high' ? '7.5'
-    : finalReport.riskLevel === 'medium' ? '5.0'
-    : '1.5';
+  // Calculate CVSS properly for on-chain badge (scale up to 100)
+  const baseScore = finalReport.cvssScore !== undefined ? finalReport.cvssScore : 
+    (finalReport.riskLevel === 'critical' ? 9.5
+    : finalReport.riskLevel === 'high' ? 7.5
+    : finalReport.riskLevel === 'medium' ? 5.0
+    : 1.5);
+  
+  const scaledScoreStr = Math.round(baseScore * 10).toString();
 
   if (opts.eas) {
-    easUid = await easAttest(path.basename(targetFile), score, ipfsCid || '', reportDir);
+    easUid = await easAttest(path.basename(targetFile), scaledScoreStr, ipfsCid || '', reportDir);
   }
 
   if (opts.mint) {
-    mintTx = await badgeMint(opts.mint, path.basename(targetFile), score, ipfsCid || '', reportDir);
+    mintTx = await badgeMint(opts.mint, path.basename(targetFile), scaledScoreStr, ipfsCid || '', zkChecksPassed, reportDir);
   }
 
   emitProgress('COMPLETED');
   emitStep('parse', 'complete', {
     message: 'Audit Pipeline Complete.',
     report: finalReport,
-    cvssScore: score,
+    cvssScore: scaledScoreStr,
     ipfsCid,
     easUid,
     mintTx,
     reportDir,
   });
 
-  return { finalReport, score, ipfsCid, easUid, mintTx, reportDir };
+  return { finalReport, score: scaledScoreStr, ipfsCid, easUid, mintTx, reportDir };
 }

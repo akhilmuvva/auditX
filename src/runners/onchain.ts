@@ -22,7 +22,7 @@ export async function easAttest(contractName: string, cvssScoreStr: string, ipfs
   return dummyEAS;
 }
 
-export async function badgeMint(walletAddress: string, contractName: string, cvssScoreStr: string, ipfsCid: string, reportDir: string) {
+export async function badgeMint(walletAddress: string, contractName: string, cvssScoreStr: string, ipfsCid: string, zkChecksPassed: boolean, reportDir: string) {
   emitStep('mint', 'active', { message: `Minting SVG Security Badge to ${walletAddress}...` });
   
   try {
@@ -51,7 +51,7 @@ export async function badgeMint(walletAddress: string, contractName: string, cvs
     const nftContract = new ethers.Contract(contractAddress, artifact.abi, wallet);
 
     emitStep('mint', 'active', { message: 'Broadcasting mint transaction to network...' });
-    const tx = await nftContract.mintBadge(walletAddress, contractName, parseInt(cvssScoreStr) || 0, ipfsCid);
+    const tx = await nftContract.mintBadge(walletAddress, contractName, parseInt(cvssScoreStr) || 0, ipfsCid, zkChecksPassed);
     const receipt = await tx.wait();
 
     emitStep('mint', 'complete', { message: `Badge Minted Successfully! TxHash: ${receipt.hash}` });
