@@ -75,7 +75,7 @@ Ensure you have Node.js (v18+) installed. To enable the local security tools, ma
 Audit a single contract file:
 
 ```bash
-node auditx.js --file ./contracts/VulnerableVault.sol
+node dist/cli.js --file ./contracts/VulnerableVault.sol
 ```
 
 ### 3. Full Decentralized Pipeline (Dry-Run Mode)
@@ -83,15 +83,15 @@ node auditx.js --file ./contracts/VulnerableVault.sol
 Run the full suite including IPFS hashing, Ethereum Attestation Service registry, and Badge NFT minting simulation:
 
 ```bash
-node auditx.js --file ./contracts/VulnerableVault.sol --ipfs --eas --mint 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --no-mythril --no-ai
+node dist/cli.js --file ./contracts/VulnerableVault.sol --ipfs --eas --mint 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --no-mythril --no-ai
 ```
 
 ### 4. Mainnet / Testnet Deployment
 
-To trigger real on-chain transactions on L2s (Base / Arbitrum Sepolia), set your keys and node providers:
+To trigger real on-chain transactions on L2s (Base / Arbitrum Sepolia), set your `PRIVATE_KEY` and `RPC_URL` in the `.env` file first, then run:
 
 ```bash
-node auditx.js --file ./contracts/VulnerableVault.sol --ipfs --eas --mint 0xRecipientAddress --private-key 0xYourPrivateKey --rpc-url https://sepolia.base.org
+node dist/cli.js --file ./contracts/VulnerableVault.sol --ipfs --eas --mint 0xRecipientAddress
 ```
 
 ---
