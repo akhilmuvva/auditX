@@ -16,6 +16,7 @@ export interface AuditXReport {
   graphInsights: {
     suryaCallGraphTopology: string;
     attackSurfacePerimeter: string;
+    mermaidGraph: string;
   };
   vulnerabilities: Array<{
     vulnerabilityId: string;
@@ -53,6 +54,7 @@ ANALYSIS STEPS:
 2. SURYA EXTERNAL CALL ATTACK SURFACE: Trace every .call/.transfer/.send edge. If surrounding block mutates storage AFTER the call (violates CEI pattern), flag Critical Reentrancy.
 3. DEDUPLICATION: Merge overlapping Slither + Mythril findings. No redundant report entries.
 4. CVSS SCALING: Convert CVSS float to strict integer × 10 (e.g. CVSS 7.5 → 75) for Solidity uint8 compatibility.
+5. MERMAID GENERATION: Create a concise, professional Mermaid.js flowchart representing the primary control flow of the contract.
 
 SOLIDITY REMEDIATION RULES:
 - Replace ALL require("string") with Solidity 0.8.x Custom Errors.
@@ -70,8 +72,9 @@ JSON Schema to return:
     "certificationStatus": "APPROVED_EMERALD | APPROVED_AMBER | DENIED_RISK_TOO_HIGH"
   },
   "graphInsights": {
-    "suryaCallGraphTopology": "String",
-    "attackSurfacePerimeter": "String"
+    "suryaCallGraphTopology": "string (Textual summary of the call graph architecture)",
+    "attackSurfacePerimeter": "string (Analysis of public/external entry points)",
+    "mermaidGraph": "string (A valid Mermaid.js graph code e.g. 'graph TD\\n A-->B' representing the contract's topological function call graph. Keep it clean and visually professional. No markdown code blocks like ```mermaid just the raw syntax.)"
   },
   "vulnerabilities": [
     {

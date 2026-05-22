@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useAuditStore, type UploadedFiles } from '../store/useAuditStore';
 import { useCyberSynth } from '../hooks/useCyberSynth';
+import { MermaidDiagram } from './MermaidDiagram';
 import {
   Play, RotateCcw, Upload, FileCode, FileJson,
   ShieldCheck, ShieldX, AlertTriangle,
@@ -172,11 +173,21 @@ const ResultBadge = ({ report }: { report: NonNullable<ReturnType<typeof useAudi
       </div>
 
       {/* Graph Insights */}
-      <div className="space-y-2">
-        <p className="text-[10px] font-bold text-gray-400 font-outfit uppercase tracking-wider">Surya Graph Topology</p>
-        <p className="text-[10px] text-gray-500 font-fira leading-relaxed">{report.graphInsights.suryaCallGraphTopology}</p>
-        <p className="text-[10px] font-bold text-gray-400 font-outfit uppercase tracking-wider mt-2">Attack Surface</p>
-        <p className="text-[10px] text-gray-500 font-fira leading-relaxed">{report.graphInsights.attackSurfacePerimeter}</p>
+      <div className="space-y-4 pt-4 border-t border-white/5">
+        <div>
+          <p className="text-[10px] font-bold text-gray-400 font-outfit uppercase tracking-wider mb-2">Topological Call Graph</p>
+          {report.graphInsights.mermaidGraph ? (
+            <div className="bg-[#020204]/80 rounded-xl border border-white/5 p-4 flex items-center justify-center">
+              <MermaidDiagram chart={report.graphInsights.mermaidGraph} />
+            </div>
+          ) : (
+            <p className="text-[10px] text-gray-500 font-fira leading-relaxed">{report.graphInsights.suryaCallGraphTopology}</p>
+          )}
+        </div>
+        <div>
+          <p className="text-[10px] font-bold text-gray-400 font-outfit uppercase tracking-wider mt-2">Attack Surface</p>
+          <p className="text-[10px] text-gray-500 font-fira leading-relaxed">{report.graphInsights.attackSurfacePerimeter}</p>
+        </div>
       </div>
     </div>
   );
