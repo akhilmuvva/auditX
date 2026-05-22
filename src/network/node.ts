@@ -19,7 +19,8 @@ export async function createAgentNode(listenPort: number = 0) {
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
     services: {
-      pubsub: gossipsub({ allowPublishToZeroPeers: true }),
+      // @ts-ignore
+      pubsub: gossipsub({ allowPublishToZeroTopicPeers: true }),
       identify: identify()
     }
   });

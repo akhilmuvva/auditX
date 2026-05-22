@@ -4,6 +4,7 @@ import fs from 'fs';
 import { emitStep, emitProgress } from './events.js';
 import { runSlither } from './runners/slither.js';
 import { runSurya } from './runners/surya.js';
+import { runMythril } from './runners/mythril.js';
 import { runZKChecks } from './analysis/zkChecks.js';
 import { runAIAnalysis } from './runners/ai.js';
 import { ipfsUpload, easAttest, badgeMint } from './runners/onchain.js';

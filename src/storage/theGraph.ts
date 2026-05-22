@@ -6,9 +6,8 @@ const GRAPH_URL = process.env.SUBGRAPH_URL || 'https://api.studio.thegraph.com/q
 export const apolloClient = new ApolloClient({
   uri: GRAPH_URL,
   cache: new InMemoryCache(),
-  // @ts-ignore
   fetch: fetch as any
-});
+} as any);
 
 export async function queryAuditsByContract(contractHash: string) {
   const QUERY = gql`
@@ -27,9 +26,10 @@ export async function queryAuditsByContract(contractHash: string) {
   try {
     const { data } = await apolloClient.query({
       query: QUERY,
-      variables: { contractHash }
+      variables: { contractHash },
+      fetchPolicy: 'network-only'
     });
-    return data.auditSubmitteds;
+    return (data as any).auditSubmitteds;
   } catch (error: any) {
     console.error('[Storage] TheGraph query failed:', error.message);
     return [];
