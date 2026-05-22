@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useWalletStore } from '../store/useWalletStore';
 import { isMetaMaskInstalled, truncateAddress, chainName } from '../lib/wallet';
-import { Shield, Loader2, ExternalLink, Zap, Lock, Globe, ChevronRight, Code2, FileCode } from 'lucide-react';
+import { Shield, Loader2, Zap, ChevronRight, Code2 } from 'lucide-react';
 
 /* ── Animated counter ── */
 const StatCard = ({ value, label, accent }: { value: string; label: string; accent: string }) => (
@@ -11,31 +11,7 @@ const StatCard = ({ value, label, accent }: { value: string; label: string; acce
   </div>
 );
 
-/* ── Feature pill ── */
-const FeaturePill = ({ text }: { text: string }) => (
-  <span className="px-3 py-1 rounded-full border border-white/10 bg-white/5 text-[10px] font-fira text-gray-400 uppercase tracking-wider">
-    {text}
-  </span>
-);
 
-/* ── Feature card ── */
-const FeatureCard = ({
-  icon, title, desc, tags,
-}: { icon: React.ReactNode; title: string; desc: string; tags: string[] }) => (
-  <div className="group relative bg-white/[0.03] border border-white/5 hover:border-indigo-400/20 rounded-2xl p-6 transition-all duration-500 hover:bg-white/[0.05] hover:-translate-y-1">
-    <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-indigo-500/0 to-purple-500/0 group-hover:from-indigo-500/5 group-hover:to-purple-500/5 transition-all duration-500" />
-    <div className="relative">
-      <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-400/20 flex items-center justify-center text-indigo-400 mb-4">
-        {icon}
-      </div>
-      <h3 className="text-sm font-bold text-gray-100 font-outfit mb-2">{title}</h3>
-      <p className="text-xs text-gray-500 font-fira leading-relaxed mb-4">{desc}</p>
-      <div className="flex flex-wrap gap-1.5">
-        {tags.map(t => <FeaturePill key={t} text={t} />)}
-      </div>
-    </div>
-  </div>
-);
 
 /* ── Main Landing Page ── */
 export const LandingPage: React.FC = () => {

@@ -96,7 +96,12 @@ export const useAuditStore = create<AuditState>((set, get) => ({
           surya: files.surya?.content,
         },
         (msg, type = 'info') =>
-          set((s) => ({ ...addLog(s, { type, text: msg }) }))
+          set((s) => ({
+            ...addLog(s, {
+              type: type === 'info' ? 'system' : (type as any),
+              text: msg
+            })
+          }))
       );
 
       const status = report.analyticsSummary.certificationStatus;

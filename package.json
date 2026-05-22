@@ -2,12 +2,17 @@
   "name": "auditx",
   "version": "1.0.0",
   "description": "",
-  "main": "dist/cli.js",
+  "main": "dist/src/cli.js",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/cli.js",
-    "dev": "ts-node src/cli.ts --server",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node dist/src/cli.js server",
+    "dev": "ts-node --esm src/cli.ts server",
+    "audit": "ts-node --esm src/cli.ts audit",
+    "siem:monitor": "ts-node --esm src/cli.ts monitor",
+    "test": "jest --config jest.config.cjs",
+    "test:siem": "jest --config jest.config.cjs test/siem.test.ts --verbose",
+    "test:contracts": "npx hardhat test",
+    "lint": "tsc --noEmit"
   },
   "keywords": [],
   "author": "",

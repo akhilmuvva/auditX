@@ -27,13 +27,13 @@ describe("AuditBadgeNFT", function () {
 
   it("Should prevent non-agent from minting", async function () {
     await expect(
-      nft.connect(addr1).mintBadge(addr1.address, "Vault", 10, "ipfs://hash")
+      nft.connect(addr1).mintBadge(addr1.address, "Vault", 10, "ipfs://hash", true)
     ).to.be.revertedWith("Only authorized agent allowed");
   });
 
   it("Should mint badge safely to recipient via agent", async function () {
     await nft.setAuthorizedAgent(agent.address);
-    const tx = await nft.connect(agent).mintBadge(addr1.address, "Vault.sol", 0, "ipfs123");
+    const tx = await nft.connect(agent).mintBadge(addr1.address, "Vault.sol", 0, "ipfs123", true);
     
     const receipt = await tx.wait();
     expect(await nft.ownerOf(1)).to.equal(addr1.address);
@@ -42,12 +42,12 @@ describe("AuditBadgeNFT", function () {
 
   it("Should revert if severity score is too high", async function () {
     await expect(
-      nft.mintBadge(addr1.address, "Danger", 75, "ipfsHash")
+      nft.mintBadge(addr1.address, "Danger", 75, "ipfsHash", true)
     ).to.be.revertedWith("Severity too high for security badge");
   });
 
   it("Should generate valid base64 JSON metadata for EMERALD GUARD", async function () {
-    await nft.mintBadge(addr1.address, "SafeContract", 15, "ipfsABC");
+    await nft.mintBadge(addr1.address, "SafeContract", 15, "ipfsABC", true);
     const uri = await nft.tokenURI(1);
     
     expect(uri).to.include("data:application/json;base64,");
@@ -63,7 +63,7 @@ describe("AuditBadgeNFT", function () {
   });
 
   it("Should generate valid base64 JSON metadata for AMBER GUARD", async function () {
-    await nft.mintBadge(addr1.address, "WarnContract", 45, "ipfsABC");
+    await nft.mintBadge(addr1.address, "WarnContract", 55, "ipfsABC", false);
     const uri = await nft.tokenURI(1);
     
     const base64Part = uri.split(",")[1];

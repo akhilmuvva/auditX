@@ -5,9 +5,10 @@ import { useCyberSynth } from '../hooks/useCyberSynth';
 import { MermaidDiagram } from './MermaidDiagram';
 import {
   Play, RotateCcw, Upload, FileCode, FileJson,
-  ShieldCheck, ShieldX, AlertTriangle,
+  ShieldCheck, ShieldX,
   CheckCircle2, Loader2,
 } from 'lucide-react';
+import { type AuditXReport } from '../lib/aiTriage';
 
 /* ──────────────────────────────────────────────
    Terminal Line
@@ -97,7 +98,7 @@ const Dropzone: React.FC<DropzoneProps> = ({ label, accept, slot, loaded, icon, 
 /* ──────────────────────────────────────────────
    Result Badge Card
 ────────────────────────────────────────────── */
-const ResultBadge = ({ report }: { report: NonNullable<ReturnType<typeof useAuditStore>['report']> }) => {
+const ResultBadge = ({ report }: { report: AuditXReport }) => {
   const s = report.analyticsSummary;
   const p = report.onChainPayload;
   const isApproved = s.certificationStatus !== 'DENIED_RISK_TOO_HIGH';
@@ -137,7 +138,7 @@ const ResultBadge = ({ report }: { report: NonNullable<ReturnType<typeof useAudi
 
       <div className="grid grid-cols-3 gap-2 text-center">
         {(['critical','high','medium','low'] as const).map(sev => {
-          const count = report.vulnerabilities.filter(v => v.severity === sev).length;
+          const count = report.vulnerabilities.filter((v: any) => v.severity === sev).length;
           if (count === 0) return null;
           const color = sev === 'critical' ? 'text-rose-400 border-rose-500/20 bg-rose-500/8' :
                         sev === 'high'     ? 'text-orange-400 border-orange-500/20 bg-orange-500/8' :
@@ -248,7 +249,7 @@ export const LiveAuditSimulator: React.FC = () => {
   const terminalEndRef = useRef<HTMLDivElement | null>(null);
 
   const handleMintBadge = async () => {
-    if (!window.ethereum) {
+    if (!(window as any).ethereum) {
       alert("No Web3 wallet detected. Please install MetaMask.");
       return;
     }
@@ -256,7 +257,7 @@ export const LiveAuditSimulator: React.FC = () => {
 
     try {
       playClick();
-      const provider = new BrowserProvider(window.ethereum as any);
+      const provider = new BrowserProvider((window as any).ethereum);
       await provider.send("eth_requestAccounts", []);
       const signer = await provider.getSigner();
       

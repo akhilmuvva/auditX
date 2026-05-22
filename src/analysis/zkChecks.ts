@@ -1,5 +1,7 @@
-import parser from '@solidity-parser/parser';
+import * as parserModule from '@solidity-parser/parser';
 import fs from 'fs';
+
+const parser = (parserModule as any).default || parserModule;
 
 export interface ZKCheckResult {
     checkName: string;
@@ -28,7 +30,7 @@ export function runZKChecks(filePath: string): ZKCheckResult[] {
 
     // A very simplistic AST visitor to detect the required patterns
     parser.visit(ast, {
-        FunctionDefinition(node) {
+        FunctionDefinition(node: any) {
             if (node.name === 'submitProof') {
                 let requireCount = 0;
                 

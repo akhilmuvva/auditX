@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useWalletStore } from '../store/useWalletStore';
 import { useAuditStore } from '../store/useAuditStore';
 import { truncateAddress, chainName } from '../lib/wallet';
 import {
   Shield, LogOut, ExternalLink, Copy, CheckCheck,
-  Activity, AlertTriangle, CheckCircle2, Clock,
+  Activity, AlertTriangle, CheckCircle2, Radio,
 } from 'lucide-react';
 import { LiveAuditSimulator } from '../components/LiveAuditSimulator';
+import { SIEMPanel } from '../components/SIEMPanel';
+
 
 const CopyableAddress = ({ address }: { address: string }) => {
   const [copied, setCopied] = React.useState(false);
@@ -26,6 +28,7 @@ const CopyableAddress = ({ address }: { address: string }) => {
 export const DashboardPage: React.FC = () => {
   const { wallet, disconnect } = useWalletStore();
   const { simStatus, report } = useAuditStore();
+  const [activeTab, setActiveTab] = useState<'audit' | 'siem'>('audit');
 
   if (!wallet) return null;
 
@@ -122,7 +125,38 @@ export const DashboardPage: React.FC = () => {
           </div>
         </div>
 
-        <LiveAuditSimulator />
+        {/* ── TAB NAVIGATION ── */}
+        <div className="flex items-center gap-1 mb-8 border-b border-white/5 pb-0">
+          <button
+            id="tab-audit"
+            onClick={() => setActiveTab('audit')}
+            className={`flex items-center gap-2 px-5 py-3 text-xs font-fira font-bold border-b-2 -mb-px transition-colors ${
+              activeTab === 'audit'
+                ? 'border-indigo-500 text-indigo-300'
+                : 'border-transparent text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            <Shield className="w-3.5 h-3.5" />
+            Audit
+          </button>
+          <button
+            id="tab-siem"
+            onClick={() => setActiveTab('siem')}
+            className={`flex items-center gap-2 px-5 py-3 text-xs font-fira font-bold border-b-2 -mb-px transition-colors ${
+              activeTab === 'siem'
+                ? 'border-rose-500 text-rose-300'
+                : 'border-transparent text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            <Radio className="w-3.5 h-3.5" />
+            SIEM Monitor
+            <span className="text-[9px] bg-rose-500/20 border border-rose-500/30 text-rose-400 px-1.5 py-0.5 rounded-full font-bold">LIVE</span>
+          </button>
+        </div>
+
+        {/* ── TAB CONTENT ── */}
+        {activeTab === 'audit' && <LiveAuditSimulator />}
+        {activeTab === 'siem'  && <SIEMPanel />}
       </main>
 
       <footer className="border-t border-white/5 py-6 text-center text-[10px] text-gray-700 font-fira mt-16">
