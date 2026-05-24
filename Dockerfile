@@ -1,11 +1,19 @@
-FROM node:20-alpine
+FROM node:20-slim
 
-# Install system dependencies (for python, build-base, and toolchains)
-RUN apk add --no-cache python3 py3-pip build-base git bash curl
+# Install system dependencies (build tools, python3, git, and curl)
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-venv \
+    build-essential \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install Slither and Mythril via pip (requires python3)
-# Note: In a production environment, mythril might require more complex setup (solc etc)
-RUN pip3 install --no-cache-dir slither-analyzer mythril --break-system-packages
+# Pin compatible setuptools and install Slither + Mythril
+RUN pip3 install --upgrade pip \
+    && pip3 install "setuptools<60" \
+    && pip3 install slither-analyzer mythril --break-system-packages
 
 WORKDIR /app
 
@@ -13,18 +21,17 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 
+# Copy application source code
+COPY . .
+
+# Compile TypeScript code
+RUN npm run build
+
 # Install Surya globally
 RUN npm install -g surya
 
-# Copy application code
-COPY . .
-
-# Build dashboard (if necessary)
-RUN cd dashboard && npm ci && npm run build
-
-# Expose ports for SSE server and Dashboard
+# Expose backend API and SIEM server port
 EXPOSE 3000
-EXPOSE 5173
 
-# Entrypoint
-CMD ["node", "auditx.js"]
+# Start AuditX API & SIEM server
+CMD ["node", "dist/src/cli.js", "server"]
