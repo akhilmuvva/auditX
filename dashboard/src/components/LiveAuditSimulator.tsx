@@ -243,6 +243,12 @@ export const LiveAuditSimulator: React.FC = () => {
   const {
     files, simStatus, terminalLogs, report,
     setFile, resetAudit, runAudit,
+    sourceTab, setSourceTab,
+    githubTarget, setGithubTarget,
+    enableForta, setEnableForta,
+    fortaAddress, setFortaAddress,
+    genBot, setGenBot,
+    runGithubAudit
   } = useAuditStore();
 
   const { playHover, playClick } = useCyberSynth();
@@ -308,73 +314,166 @@ export const LiveAuditSimulator: React.FC = () => {
       {/* ── MAIN GRID ── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-        {/* LEFT — File Upload Panel (5 cols) */}
+        {/* LEFT — Input Settings Panel (5 cols) */}
         <div className="lg:col-span-5 flex flex-col gap-4">
 
           <div className="bg-cyber-card border border-white/5 rounded-2xl p-5 backdrop-blur-md flex flex-col gap-3">
-            <div className="flex items-center gap-2 mb-1">
-              <FileCode className="w-4 h-4 text-cyan-400" />
-              <span className="text-xs font-bold text-gray-200 font-outfit uppercase tracking-wider">Upload Contract Files</span>
+            
+            {/* Source selection tabs */}
+            <div className="flex border-b border-white/5 pb-2 mb-2 gap-4">
+              <button
+                onClick={() => { playClick(); setSourceTab('upload'); }}
+                className={`text-[10px] font-bold uppercase tracking-wider pb-1.5 transition-colors border-b-2 font-outfit select-none cursor-pointer ${
+                  sourceTab === 'upload' ? 'text-cyan-400 border-cyan-400' : 'text-gray-500 border-transparent hover:text-gray-300'
+                }`}
+              >
+                Local Upload
+              </button>
+              <button
+                onClick={() => { playClick(); setSourceTab('github'); }}
+                className={`text-[10px] font-bold uppercase tracking-wider pb-1.5 transition-colors border-b-2 font-outfit select-none cursor-pointer ${
+                  sourceTab === 'github' ? 'text-cyan-400 border-cyan-400' : 'text-gray-500 border-transparent hover:text-gray-300'
+                }`}
+              >
+                GitHub Import
+              </button>
             </div>
 
-            {/* .sol — Required */}
-            <Dropzone
-              label="Solidity Contract (.sol)"
-              accept=".sol"
-              slot="sol"
-              loaded={files.sol}
-              icon={<FileCode className="w-4 h-4" />}
-              hint="Required — drag & drop or click to browse"
-              onLoad={readFile}
-              onClear={(slot) => setFile(slot, null)}
-              disabled={isRunning}
-            />
+            {sourceTab === 'upload' ? (
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <FileCode className="w-4 h-4 text-cyan-400" />
+                  <span className="text-xs font-bold text-gray-200 font-outfit uppercase tracking-wider">Upload Contract Files</span>
+                </div>
 
-            <div className="border-t border-white/5 pt-3">
-              <p className="text-[10px] text-gray-500 font-fira mb-2 uppercase tracking-wider">
-                Optional — Tool Output JSONs (improves analysis precision)
-              </p>
+                {/* .sol — Required */}
+                <Dropzone
+                  label="Solidity Contract (.sol)"
+                  accept=".sol"
+                  slot="sol"
+                  loaded={files.sol}
+                  icon={<FileCode className="w-4 h-4" />}
+                  hint="Required — drag & drop or click to browse"
+                  onLoad={readFile}
+                  onClear={(slot) => setFile(slot, null)}
+                  disabled={isRunning}
+                />
 
-              {/* Slither JSON */}
-              <div className="flex flex-col gap-2">
-                <Dropzone
-                  label="Slither Output (.json)"
-                  accept=".json"
-                  slot="slither"
-                  loaded={files.slither}
-                  icon={<FileJson className="w-4 h-4" />}
-                  hint="slither contract.sol --json slither.json"
-                  onLoad={readFile}
-                  onClear={(slot) => setFile(slot, null)}
-                  disabled={isRunning}
-                />
-                <Dropzone
-                  label="Mythril Output (.json)"
-                  accept=".json"
-                  slot="mythril"
-                  loaded={files.mythril}
-                  icon={<FileJson className="w-4 h-4" />}
-                  hint="Run: myth analyze contract.sol -o json"
-                  onLoad={readFile}
-                  onClear={(slot) => setFile(slot, null)}
-                  disabled={isRunning}
-                />
-                <Dropzone
-                  label="Surya Output (.json)"
-                  accept=".json"
-                  slot="surya"
-                  loaded={files.surya}
-                  icon={<FileJson className="w-4 h-4" />}
-                  hint="Run: surya describe contract.sol > surya.json"
-                  onLoad={readFile}
-                  onClear={(slot) => setFile(slot, null)}
-                  disabled={isRunning}
-                />
+                <div className="border-t border-white/5 pt-3">
+                  <p className="text-[10px] text-gray-500 font-fira mb-2 uppercase tracking-wider">
+                    Optional — Tool Output JSONs (improves analysis precision)
+                  </p>
+
+                  {/* Slither JSON */}
+                  <div className="flex flex-col gap-2">
+                    <Dropzone
+                      label="Slither Output (.json)"
+                      accept=".json"
+                      slot="slither"
+                      loaded={files.slither}
+                      icon={<FileJson className="w-4 h-4" />}
+                      hint="slither contract.sol --json slither.json"
+                      onLoad={readFile}
+                      onClear={(slot) => setFile(slot, null)}
+                      disabled={isRunning}
+                    />
+                    <Dropzone
+                      label="Mythril Output (.json)"
+                      accept=".json"
+                      slot="mythril"
+                      loaded={files.mythril}
+                      icon={<FileJson className="w-4 h-4" />}
+                      hint="Run: myth analyze contract.sol -o json"
+                      onLoad={readFile}
+                      onClear={(slot) => setFile(slot, null)}
+                      disabled={isRunning}
+                    />
+                    <Dropzone
+                      label="Surya Output (.json)"
+                      accept=".json"
+                      slot="surya"
+                      loaded={files.surya}
+                      icon={<FileJson className="w-4 h-4" />}
+                      hint="Run: surya describe contract.sol > surya.json"
+                      onLoad={readFile}
+                      onClear={(slot) => setFile(slot, null)}
+                      disabled={isRunning}
+                    />
+                  </div>
+                </div>
               </div>
+            ) : (
+              <div className="flex flex-col gap-3.5">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <FileCode className="w-4 h-4 text-cyan-400" />
+                  <span className="text-xs font-bold text-gray-200 font-outfit uppercase tracking-wider">GitHub Repository Target</span>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] text-gray-400 font-fira uppercase tracking-wider">Repository Path or URL</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. owner/repo/contracts/Token.sol"
+                    value={githubTarget}
+                    onChange={(e) => setGithubTarget(e.target.value)}
+                    disabled={isRunning}
+                    className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-xs text-gray-200 focus:outline-none focus:border-cyan-400/50 font-fira transition-colors"
+                  />
+                  <p className="text-[9px] text-gray-500 font-fira leading-relaxed">
+                    Accepts shortcode `owner/repo/contracts/File.sol` or full repository HTTPS URLs.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Forta Network Post-Deploy Monitoring Config */}
+            <div className="border-t border-white/5 pt-3.5 mt-1.5">
+              <div className="flex items-center gap-2 mb-1.5">
+                <input
+                  type="checkbox"
+                  id="enable-forta"
+                  checked={enableForta}
+                  onChange={(e) => setEnableForta(e.target.checked)}
+                  disabled={isRunning}
+                  className="rounded border-white/10 bg-black/40 text-cyan-400 focus:ring-0 cursor-pointer w-3.5 h-3.5"
+                />
+                <label htmlFor="enable-forta" className="text-[10px] font-bold text-gray-300 font-outfit uppercase tracking-wider cursor-pointer select-none">
+                  Enable Forta Monitoring
+                </label>
+              </div>
+
+              {enableForta && (
+                <div className="flex flex-col gap-3 pl-5 border-l border-cyan-400/20 mt-2.5 space-y-1 animate-[fadeIn_0.3s_ease]">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[9px] text-gray-500 font-fira uppercase tracking-wider">Deployed Address</label>
+                    <input
+                      type="text"
+                      placeholder="0x..."
+                      value={fortaAddress}
+                      onChange={(e) => setFortaAddress(e.target.value)}
+                      disabled={isRunning}
+                      className="bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-gray-200 focus:outline-none focus:border-cyan-400/50 font-fira transition-colors"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="gen-bot"
+                      checked={genBot}
+                      onChange={(e) => setGenBot(e.target.checked)}
+                      disabled={isRunning}
+                      className="rounded border-white/10 bg-black/40 text-cyan-400 focus:ring-0 cursor-pointer w-3.5 h-3.5"
+                    />
+                    <label htmlFor="gen-bot" className="text-[9px] text-gray-400 font-fira cursor-pointer select-none">
+                      Auto-generate Threat Detection Bot
+                    </label>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Code preview */}
-            {files.sol && (
+            {sourceTab === 'upload' && files.sol && (
               <div className="bg-black/30 rounded-xl border border-white/5 overflow-hidden">
                 <div className="flex items-center justify-between px-4 py-2 border-b border-white/5">
                   <span className="text-[10px] font-fira text-gray-400">{files.sol.name}</span>
@@ -411,8 +510,15 @@ export const LiveAuditSimulator: React.FC = () => {
               </button>
             )}
             <button
-              onClick={() => { playClick(); runAudit(); }}
-              disabled={isRunning || !files.sol}
+              onClick={() => {
+                playClick();
+                if (sourceTab === 'github') {
+                  runGithubAudit();
+                } else {
+                  runAudit();
+                }
+              }}
+              disabled={isRunning || (sourceTab === 'upload' ? !files.sol : !githubTarget.trim())}
               onMouseEnter={playHover}
               className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-700 hover:from-indigo-500 hover:to-purple-600 border border-indigo-400/25 text-white font-bold py-3 px-6 rounded-xl hover:-translate-y-0.5 hover:shadow-glow-indigo transition-all duration-300 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
             >
