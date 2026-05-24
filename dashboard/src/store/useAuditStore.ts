@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { runAiTriage, type AuditXReport } from '../lib/aiTriage';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
 export type SimStatus = 'IDLE' | 'RUNNING' | 'COMPLETED' | 'ERROR';
 
 export interface TerminalLog {
@@ -167,14 +169,14 @@ export const useAuditStore = create<AuditState>((set, get) => ({
       simStatus: 'RUNNING',
       report: null,
       terminalLogs: [
-        { type: 'system', text: `[AuditX] Contacting backend API on http://localhost:3000...`, ts: Date.now() },
+        { type: 'system', text: `[AuditX] Contacting backend API on ${API_URL}...`, ts: Date.now() },
         { type: 'system', text: `[GitHub] Initiating remote import for: ${githubTarget}`, ts: Date.now() },
       ],
     });
 
     try {
       // Connect to Server-Sent Events (SSE) telemetry stream before POSTing
-      const sse = new EventSource('http://localhost:3000/stream');
+      const sse = new EventSource(`${API_URL}/stream`);
 
       sse.addEventListener('step', (ev) => {
         try {
@@ -190,7 +192,7 @@ export const useAuditStore = create<AuditState>((set, get) => ({
           if (data.step === 'parse' && data.status === 'complete') {
             sse.close();
             // Fetch the compiled, real report from the backend report endpoint!
-            fetch('http://localhost:3000/api/reports/latest')
+            fetch(`${API_URL}/api/reports/latest`)
               .then(res => res.json())
               .then(backendReport => {
                 const cvssRaw = parseInt(backendReport.cvssScore) || 15;
@@ -260,7 +262,7 @@ export const useAuditStore = create<AuditState>((set, get) => ({
       };
 
       // Trigger the POST request to start background cloning & scanning
-      const response = await fetch('http://localhost:3000/api/audit/github', {
+      const response = await fetch(`${API_URL}/api/audit/github`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

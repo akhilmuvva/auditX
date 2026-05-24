@@ -34,7 +34,8 @@ interface SIEMStore {
 
 // ─── Default WS URL ───────────────────────────────────────────────────────────
 
-const DEFAULT_WS_URL = 'ws://localhost:3000/ws/siem';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const DEFAULT_WS_URL = `${API_URL.replace(/^http/, 'ws')}/ws/siem`;
 
 // ─── Store ────────────────────────────────────────────────────────────────────
 
