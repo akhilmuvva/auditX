@@ -16,6 +16,7 @@ import readline from 'readline';
 import { runSlither } from './runners/slither.js';
 import { runMythril } from './runners/mythril.js';
 import { runSurya } from './runners/surya.js';
+import { runPipeline } from './pipeline.js';
 import { SIEMEngine } from './siem/index.js';
 import type { ChainEvent } from './siem/types.js';
 
@@ -36,18 +37,45 @@ const program = new Command();
 program
   .name('auditx')
   .description('AuditX — Decentralized Smart Contract Security Toolkit')
-  .version('2.0.0');
+  .version('2.0.0')
+  .enablePositionalOptions();
 
 // ─── audit sub-command ───────────────────────────────────────────────────────
 
 program
   .command('audit')
-  .description('Run static analysis (Slither / Mythril / Surya) on a Solidity file')
+  .description('Run smart contract audit pipeline (static checks, ZK, AI, EAS, Forta, Badge mint)')
   .requiredOption('-t, --target <path>', 'Path to Solidity file or directory')
   .option('-m, --mythril', 'Enable Mythril symbolic execution (slower)')
-  .option('-o, --out <dir>', 'Output directory for JSON results', './auditx-output')
+  .option('-o, --out <dir>', 'Output directory for JSON results', './auditx-reports')
+  .option('--ai', 'Enable Claude AI triage analysis (default: true)', true)
+  .option('--no-ai', 'Disable Claude AI triage analysis')
+  .option('--ipfs', 'Pin report telemetry to IPFS')
+  .option('--eas', 'Mint Ethereum Attestation Service proof on-chain')
+  .option('--mint <address>', 'Mint SVG Security Badge NFT to recipient wallet address')
+  .option('--force', 'Bypass all caches, run fresh analysis')
+  .option('--monitor', 'Fetch live Forta alerts for deployed contract (requires --address)')
+  .option('--address <addr>', 'Deployed contract address to monitor')
+  .option('--chain <id>', 'Chain ID for monitoring (default: 1)')
+  .option('--gen-bot', 'Auto-generate custom Forta detection bot from findings')
+  .option('--name <string>', 'Contract name for bot generation')
   .action(async (opts) => {
-    banner('Local Static Analysis Runner');
+    banner('Audit & Lifecycle Security Pipeline');
+
+    // Validations
+    if (opts.monitor && !opts.address) {
+      console.error('❌ [AuditX] --monitor requires --address <deployedContractAddress>');
+      process.exit(1);
+    }
+
+    if (opts.address && !/^0x[0-9a-fA-F]{40}$/.test(opts.address)) {
+      console.error('❌ [AuditX] Invalid --address format. Expected: 0x followed by 40 hex chars');
+      process.exit(1);
+    }
+
+    if (opts.genBot && !opts.monitor) {
+      console.warn('⚠️ [AuditX] --gen-bot works best with --monitor. Running without Forta alerts.');
+    }
 
     const files = await resolveTarget(opts.target);
     if (files.length === 0) {
@@ -55,45 +83,42 @@ program
       process.exit(1);
     }
 
-    const contractName = path.basename(files[0], '.sol');
-    const outDir = path.resolve(opts.out, contractName);
-    fs.mkdirSync(outDir, { recursive: true });
+    const targetFile = files[0];
+    const chainId = opts.chain ? Number(opts.chain) : 1;
 
-    console.log(`📂 Contract:  ${files[0]}`);
-    console.log(`📁 Output:    ${outDir}\n`);
-
-    // 1. Slither
-    console.log('🔍 Running Slither static analysis…');
-    try {
-      const findings = await runSlither(files[0], outDir);
-      fs.writeFileSync(path.join(outDir, 'slither.json'), JSON.stringify(findings, null, 2));
-      console.log(`   ✓ Slither: ${findings.length} finding(s) → ${outDir}/slither.json`);
-    } catch (e: any) { console.warn(`   ⚠  Slither skipped: ${e.message}`); }
-
-    // 2. Mythril (optional)
-    if (opts.mythril) {
-      console.log('🔬 Running Mythril symbolic execution…');
-      try {
-        const findings = await runMythril(files, outDir);
-        fs.writeFileSync(path.join(outDir, 'mythril.json'), JSON.stringify(findings, null, 2));
-        console.log(`   ✓ Mythril: ${findings.length} finding(s) → ${outDir}/mythril.json`);
-      } catch (e: any) { console.warn(`   ⚠  Mythril skipped: ${e.message}`); }
+    console.log(`📂 Contract Target: ${targetFile}`);
+    if (opts.address) {
+      console.log(`📡 Deployed Addr:   ${opts.address} (Chain: ${chainId})`);
     }
 
-    // 3. Surya
-    console.log('📊 Running Surya call-graph analysis…');
     try {
-      const data = await runSurya(files, outDir);
-      fs.writeFileSync(path.join(outDir, 'surya.json'), JSON.stringify(data, null, 2));
-      console.log(`   ✓ Surya: call graph → ${outDir}/surya.json`);
-    } catch (e: any) { console.warn(`   ⚠  Surya skipped: ${e.message}`); }
+      const pipelineOpts = {
+        mythril: !!opts.mythril,
+        ai: opts.ai !== false,
+        ipfs: !!opts.ipfs,
+        eas: !!opts.eas,
+        mint: opts.mint,
+        force: !!opts.force,
+        monitor: !!opts.monitor,
+        contractAddress: opts.address,
+        chainId,
+        generateBot: !!opts.genBot,
+        contractName: opts.name || path.basename(targetFile, '.sol'),
+      };
 
-    console.log('\n' + '─'.repeat(60));
-    console.log('✅ Local analysis complete!');
-    console.log('\nNext steps:');
-    console.log(`  1. Open the AuditX dashboard`);
-    console.log(`  2. Upload: ${files[0]}`);
-    console.log('─'.repeat(60) + '\n');
+      const result = await runPipeline(targetFile, pipelineOpts);
+      
+      console.log('\n' + '─'.repeat(60));
+      console.log('✅ Audit & Lifecycle Security Pipeline Complete!');
+      if (result.reportDir) {
+        console.log(`📂 Saved Report Folder: ${result.reportDir}`);
+      }
+      console.log('─'.repeat(60) + '\n');
+
+    } catch (err: any) {
+      console.error(`\n❌ Pipeline execution failed: ${err.message}`);
+      process.exit(1);
+    }
   });
 
 // ─── monitor sub-command ─────────────────────────────────────────────────────

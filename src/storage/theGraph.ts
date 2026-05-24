@@ -1,13 +1,12 @@
-import { ApolloClient, InMemoryCache, gql } from '@apollo/client/core/index.js';
+import { ApolloClient, InMemoryCache, HttpLink, gql } from '@apollo/client/core/index.js';
 import fetch from 'node-fetch';
 
 const GRAPH_URL = process.env.SUBGRAPH_URL || 'https://api.studio.thegraph.com/query/auditx/v1';
 
 export const apolloClient = new ApolloClient({
-  uri: GRAPH_URL,
-  cache: new InMemoryCache(),
-  fetch: fetch as any
-} as any);
+  link: new HttpLink({ uri: GRAPH_URL, fetch: fetch as any }),
+  cache: new InMemoryCache()
+});
 
 export async function queryAuditsByContract(contractHash: string) {
   const QUERY = gql`

@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AuditX Report — VulnerableVault.sol</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --bg2: #111118;
+      --bg3: #1a1a24;
+      --border: #2a2a3a;
+      --text: #e8e8f0;
+      --text2: #8888aa;
+      --accent: #6366f1;
+      --critical: #ef4444;
+      --high: #f97316;
+      --medium: #eab308;
+      --low: #22c55e;
+      --info: #3b82f6;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    /* Header */
+    .header {
+      background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #0f0f1a 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 24px 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(10px);
+    }
+    .logo {
+      font-family: 'Space Mono', monospace;
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: -0.5px;
+    }
+    .logo span { color: var(--text); }
+    .header-meta {
+      font-size: 12px;
+      color: var(--text2);
+      text-align: right;
+      font-family: 'Space Mono', monospace;
+    }
+
+    /* Risk banner */
+    .risk-banner {
+      padding: 3px 12px;
+      border-radius: 4px;
+      font-family: 'Space Mono', monospace;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1px;
+    }
+    .risk-CRITICAL { background: #ef444420; color: #ef4444; border: 1px solid #ef444440; }
+    .risk-HIGH     { background: #f9731620; color: #f97316; border: 1px solid #f9731640; }
+    .risk-MEDIUM   { background: #eab30820; color: #eab308; border: 1px solid #eab30840; }
+    .risk-LOW      { background: #22c55e20; color: #22c55e; border: 1px solid #22c55e40; }
+    .risk-SAFE     { background: #22c55e20; color: #22c55e; border: 1px solid #22c55e40; }
+
+    @keyframes pulse-red {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(0.96); }
+    }
+    .pulse-critical {
+      animation: pulse-red 2s infinite ease-in-out;
+    }
+
+    /* Layout */
+    .container { max-width: 1400px; margin: 0 auto; padding: 32px 40px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+    .grid-2 { display: grid; grid-template-columns: 2fr 1fr; gap: 24px; }
+
+    /* Cards */
+    .card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .card-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+      font-family: 'Space Mono', monospace;
+    }
+    .card-value {
+      font-size: 36px;
+      font-weight: 600;
+      font-family: 'Space Mono', monospace;
+      line-height: 1;
+    }
+    .card-sub { font-size: 12px; color: var(--text2); margin-top: 6px; }
+
+    /* Score ring */
+    .score-card {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    .score-ring {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Space Mono', monospace;
+      font-size: 20px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    /* Severity bars */
+    .sev-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .sev-label {
+      width: 70px;
+      font-size: 11px;
+      font-family: 'Space Mono', monospace;
+      font-weight: 600;
+    }
+    .sev-bar-wrap {
+      flex: 1;
+      height: 6px;
+      background: var(--bg3);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .sev-bar { height: 100%; border-radius: 3px; transition: width 1s ease; }
+    .sev-count {
+      width: 24px;
+      font-size: 12px;
+      font-family: 'Space Mono', monospace;
+      text-align: right;
+    }
+
+    /* Findings table */
+    .findings-section { margin-top: 24px; margin-bottom: 24px; }
+    .section-title {
+      font-family: 'Space Mono', monospace;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .finding-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 12px;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .finding-card:hover { border-color: var(--accent); background: var(--bg3); }
+    .finding-card.expanded { border-color: var(--accent); }
+    .finding-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .finding-sev {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-family: 'Space Mono', monospace;
+      letter-spacing: 0.5px;
+      flex-shrink: 0;
+    }
+    .finding-id {
+      font-size: 10px;
+      color: var(--text2);
+      font-family: 'Space Mono', monospace;
+      flex-shrink: 0;
+    }
+    .finding-title {
+      font-size: 13px;
+      font-weight: 500;
+      flex: 1;
+    }
+    .finding-tool {
+      font-size: 10px;
+      color: var(--text2);
+      font-family: 'Space Mono', monospace;
+      padding: 2px 6px;
+      background: var(--bg3);
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+    .finding-body {
+      display: none;
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
+    .finding-body.show { display: block; }
+    .finding-desc {
+      font-size: 13px;
+      color: var(--text2);
+      margin-bottom: 12px;
+      line-height: 1.6;
+    }
+    .finding-loc {
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      color: var(--accent);
+      margin-bottom: 12px;
+    }
+    .finding-rec {
+      background: var(--bg3);
+      border-radius: 6px;
+      padding: 12px;
+      font-size: 12px;
+      border-left: 3px solid var(--accent);
+    }
+    .finding-rec strong { color: var(--text); display: block; margin-bottom: 4px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+    pre {
+      background: #000;
+      border-radius: 6px;
+      padding: 12px;
+      font-size: 11px;
+      overflow-x: auto;
+      margin-top: 8px;
+      border: 1px solid var(--border);
+      color: #a8ff78;
+      font-family: 'Space Mono', monospace;
+    }
+
+    /* AI section */
+    .ai-card {
+      background: linear-gradient(135deg, #1a1a2e, #16213e);
+      border: 1px solid #2a2a5a;
+      border-radius: 12px;
+      padding: 20px;
+      margin-top: 24px;
+      margin-bottom: 24px;
+    }
+    .ai-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: #6366f1;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-family: 'Space Mono', monospace;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .ai-summary {
+      font-size: 14px;
+      color: var(--text);
+      line-height: 1.7;
+      margin-bottom: 16px;
+    }
+    .ai-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .ai-section-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+    .ai-list { list-style: none; }
+    .ai-list li {
+      font-size: 12px;
+      color: var(--text2);
+      padding: 4px 0;
+      padding-left: 14px;
+      position: relative;
+    }
+    .ai-list li::before { content: '→'; position: absolute; left: 0; color: var(--accent); }
+
+    /* Forta live alerts table */
+    .forta-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+    }
+    .forta-table th, .forta-table td {
+      padding: 10px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+    }
+    .forta-table th {
+      color: var(--text2);
+      font-family: 'Space Mono', monospace;
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 10px;
+      letter-spacing: 0.5px;
+    }
+    .forta-sev-pill {
+      font-family: 'Space Mono', monospace;
+      font-size: 9px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .forta-sev-CRITICAL { background: #ef4444; color: #fff; }
+    .forta-sev-HIGH     { background: #f97316; color: #fff; }
+    .forta-sev-MEDIUM   { background: #eab308; color: #000; }
+    .forta-sev-LOW      { background: #3b82f6; color: #fff; }
+    .forta-sev-INFO     { background: #8888aa; color: #fff; }
+
+    .forta-stat-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .forta-stat-box {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+    }
+    .forta-stat-label {
+      font-size: 9px;
+      color: var(--text2);
+      font-family: 'Space Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+    .forta-stat-value {
+      font-size: 20px;
+      font-weight: 700;
+      font-family: 'Space Mono', monospace;
+    }
+
+    /* Warning & success banner cards */
+    .banner-warning {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #f87171;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-family: 'Space Mono', monospace;
+      margin-bottom: 16px;
+    }
+    .banner-success {
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+      color: #4ade80;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-family: 'Space Mono', monospace;
+      margin-bottom: 16px;
+    }
+
+    /* Filters */
+    .filters {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .filter-btn {
+      padding: 5px 14px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg2);
+      color: var(--text2);
+      font-size: 11px;
+      font-family: 'Space Mono', monospace;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .filter-btn:hover, .filter-btn.active {
+      border-color: var(--accent);
+      color: var(--text);
+      background: var(--bg3);
+    }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      padding: 32px;
+      color: var(--text2);
+      font-size: 12px;
+      border-top: 1px solid var(--border);
+      margin-top: 48px;
+      font-family: 'Space Mono', monospace;
+    }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .finding-card { animation: fadeIn 0.3s ease; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="logo">Audit<span>X</span></div>
+    <div style="font-size:11px;color:var(--text2);margin-top:2px;font-family:'Space Mono',monospace" id="header-contract-name">VulnerableVault.sol</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:16px">
+    <div class="risk-banner" id="header-risk-badge">SAFE</div>
+    <div class="header-meta" id="header-date-meta">
+      21/5/2026<br>
+      Slither + Surya
+    </div>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- Stats row -->
+  <div class="grid-3">
+    <div class="card score-card">
+      <div class="score-ring" id="ring-score-circle" style="background:conic-gradient(#22c55e 0deg, #1a1a24 0deg)">
+        0
+      </div>
+      <div>
+        <div class="card-label">Risk Score</div>
+        <div style="font-size:20px;font-family:'Space Mono',monospace;font-weight:700" id="card-risk-label">SAFE</div>
+        <div class="card-sub" id="card-risk-sub">0 total findings</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Findings by Severity</div>
+      <div class="sev-row"><div class="sev-label" style="color:#ef4444">CRITICAL</div><div class="sev-bar-wrap"><div class="sev-bar" id="bar-CRITICAL" style="background:#ef4444;width:0%"></div></div><div class="sev-count" id="count-CRITICAL">0</div></div>
+      <div class="sev-row"><div class="sev-label" style="color:#f97316">HIGH</div><div class="sev-bar-wrap"><div class="sev-bar" id="bar-HIGH" style="background:#f97316;width:0%"></div></div><div class="sev-count" id="count-HIGH">0</div></div>
+      <div class="sev-row"><div class="sev-label" style="color:#eab308">MEDIUM</div><div class="sev-bar-wrap"><div class="sev-bar" id="bar-MEDIUM" style="background:#eab308;width:0%"></div></div><div class="sev-count" id="count-MEDIUM">0</div></div>
+      <div class="sev-row"><div class="sev-label" style="color:#22c55e">LOW</div><div class="sev-bar-wrap"><div class="sev-bar" id="bar-LOW" style="background:#22c55e;width:0%"></div></div><div class="sev-count" id="count-LOW">0</div></div>
+      <div class="sev-row"><div class="sev-label" style="color:#3b82f6">INFO</div><div class="sev-bar-wrap"><div class="sev-bar" id="bar-INFO" style="background:#3b82f6;width:0%"></div></div><div class="sev-count" id="count-INFO">0</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Audit Info</div>
+      <div style="font-size:12px;color:var(--text2);line-height:2" id="audit-info-details">
+        <div><span style="color:var(--text)">Target:</span> VulnerableVault.sol</div>
+        <div><span style="color:var(--text)">Tools:</span> Slither + Surya</div>
+        <div><span style="color:var(--text)">AI Triage:</span> Active</div>
+        <div><span style="color:var(--text)">Date:</span> 24/5/2026</div>
+        <div><span style="color:var(--text)">Auditor:</span> AuditX v2.0.0</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dynamic Forta Live Monitor Panel -->
+  <div id="forta-monitor-section" style="display:none;" class="findings-section">
+    <div class="section-title">🔭 Post-Deploy Monitoring — Forta Network</div>
+    <div class="card" style="margin-bottom: 24px; background: var(--bg2);">
+      
+      <!-- Scam Detector alerts banner -->
+      <div id="scam-banner"></div>
+
+      <!-- Core stats -->
+      <div class="forta-stat-grid">
+        <div class="forta-stat-box">
+          <div class="forta-stat-label">Total Alerts</div>
+          <div class="forta-stat-value" id="forta-total-alerts">0</div>
+        </div>
+        <div class="forta-stat-box">
+          <div class="forta-stat-label" style="color:#ef4444;">Critical</div>
+          <div class="forta-stat-value" id="forta-critical-alerts">0</div>
+        </div>
+        <div class="forta-stat-box">
+          <div class="forta-stat-label" style="color:#f97316;">High</div>
+          <div class="forta-stat-value" id="forta-high-alerts">0</div>
+        </div>
+        <div class="forta-stat-box">
+          <div class="forta-stat-label" style="color:var(--accent);">Risk Rating</div>
+          <div class="forta-stat-value" id="forta-risk-score">0%</div>
+        </div>
+      </div>
+
+      <!-- Alert feed -->
+      <div class="card-label" style="margin-top: 10px;">Recent Alert Feed</div>
+      <div id="forta-alerts-container"></div>
+    </div>
+  </div>
+
+  <!-- Dynamic Auto-Generated Forta Bot Panel -->
+  <div id="forta-bot-section" style="display:none;" class="findings-section">
+    <div class="section-title">🤖 Auto-Generated Forta Monitoring Bot</div>
+    <div class="card" style="background: var(--bg2); border: 1px solid var(--border);">
+      <div class="card-label">Threat Detection Bot Package</div>
+      <div style="font-size: 13px; color: var(--text2); margin-bottom: 16px;">
+        AuditX has auto-generated a custom Forta detection agent tailored to watch your contract 24/7 on the decentralized Forta Network.
+      </div>
+
+      <div style="font-size: 12px; color: var(--text); line-height: 2; margin-bottom: 20px;">
+        <div><span style="color:var(--text2)">Bot Name:</span> <span id="bot-meta-name" style="font-family:'Space Mono',monospace;">AuditXMonitor</span></div>
+        <div><span style="color:var(--text2)">Rules Monitored:</span> <span id="bot-meta-rules" style="font-family:'Space Mono',monospace;">-</span></div>
+        <div><span style="color:var(--text2)">Target Contract:</span> <span id="bot-meta-address" style="font-family:'Space Mono',monospace;">-</span></div>
+      </div>
+
+      <!-- Rules Table -->
+      <div class="card-label">Active Detection Heuristics</div>
+      <table class="forta-table" style="margin-bottom: 24px;">
+        <thead>
+          <tr>
+            <th>Rule ID</th>
+            <th>Severity</th>
+            <th>Vulnerability Monitored</th>
+            <th>Trigger Condition</th>
+          </tr>
+        </thead>
+        <tbody id="bot-rules-tbody"></tbody>
+      </table>
+
+      <!-- Deploy instructions -->
+      <div class="card-label">Deployment Instructions</div>
+      <div style="font-size: 12px; color: var(--text2); margin-bottom: 8px;">
+        Deploy this threat monitor onto Forta nodes in 4 quick commands:
+      </div>
+      <pre id="bot-deploy-commands">
+# 1. Navigate to the generated bot folder
+cd auditx-reports/scan_<timestamp>/forta-bots/<name>_monitor
+
+# 2. Install Forta SDK dependencies
+npm install
+
+# 3. Test agent locally
+npx forta-agent@latest run
+
+# 4. Deploy live monitoring agent to Forta Network
+npx forta-agent@latest push</pre>
+    </div>
+  </div>
+
+  <!-- Findings -->
+  <div class="findings-section">
+    <div class="section-title" id="findings-section-title">Detailed Findings (0)</div>
+
+    <div class="filters">
+      <button class="filter-btn active" id="btn-filter-all" onclick="filterFindings('ALL')">All (0)</button>
+      <button class="filter-btn" id="btn-filter-critical" onclick="filterFindings('CRITICAL')" style="color:#ef4444">Critical (0)</button>
+      <button class="filter-btn" id="btn-filter-high" onclick="filterFindings('HIGH')" style="color:#f97316">High (0)</button>
+      <button class="filter-btn" id="btn-filter-medium" onclick="filterFindings('MEDIUM')" style="color:#eab308">Medium (0)</button>
+      <button class="filter-btn" id="btn-filter-low" onclick="filterFindings('LOW')" style="color:#22c55e">Low (0)</button>
+    </div>
+
+    <div id="findings-container"></div>
+  </div>
+
+</div>
+
+<div class="footer">
+  AuditX v2.0.0 — Built by Muvva Akhil Yadav — github.com/akhilmuvva/auditx<br>
+  <span style="color:#444">This automated report supplements but does not replace a professional manual audit.</span>
+</div>
+
+<script>
+  // Dynamically populated at run-time
+  const findings = [];
+  const summary = {"counts":{"CRITICAL":0,"HIGH":0,"MEDIUM":0,"LOW":0,"INFO":0},"riskScore":0,"riskLevel":"SAFE","total":0};
+  const auditData = null;
+
+  // Initialize page components
+  document.addEventListener('DOMContentLoaded', () => {
+    // 1. Set titles
+    const contract = auditData?.fortaMonitor?.contractAddress ? VulnerableVaultName(auditData.fortaMonitor.contractAddress) : 'VulnerableVault.sol';
+    
+    // 2. Load findings count
+    const totalCount = findings.length;
+    document.getElementById('findings-section-title').textContent = `Detailed Findings (${totalCount})`;
+    document.getElementById('btn-filter-all').textContent = `All (${totalCount})`;
+
+    // Populate severity counters
+    const criticalCount = findings.filter(f => f.severity?.toUpperCase() === 'CRITICAL').length;
+    const highCount = findings.filter(f => f.severity?.toUpperCase() === 'HIGH').length;
+    const mediumCount = findings.filter(f => f.severity?.toUpperCase() === 'MEDIUM').length;
+    const lowCount = findings.filter(f => f.severity?.toUpperCase() === 'LOW').length;
+    const infoCount = findings.filter(f => f.severity?.toUpperCase() === 'INFO').length;
+
+    document.getElementById('btn-filter-critical').textContent = `Critical (${criticalCount})`;
+    document.getElementById('btn-filter-high').textContent = `High (${highCount})`;
+    document.getElementById('btn-filter-medium').textContent = `Medium (${mediumCount})`;
+    document.getElementById('btn-filter-low').textContent = `Low (${lowCount})`;
+
+    // Set bars
+    const maxVal = Math.max(criticalCount, highCount, mediumCount, lowCount, infoCount, 1);
+    document.getElementById('bar-CRITICAL').style.width = `${(criticalCount / maxVal) * 100}%`;
+    document.getElementById('count-CRITICAL').textContent = criticalCount;
+    
+    document.getElementById('bar-HIGH').style.width = `${(highCount / maxVal) * 100}%`;
+    document.getElementById('count-HIGH').textContent = highCount;
+
+    document.getElementById('bar-MEDIUM').style.width = `${(mediumCount / maxVal) * 100}%`;
+    document.getElementById('count-MEDIUM').textContent = mediumCount;
+
+    document.getElementById('bar-LOW').style.width = `${(lowCount / maxVal) * 100}%`;
+    document.getElementById('count-LOW').textContent = lowCount;
+
+    document.getElementById('bar-INFO').style.width = `${(infoCount / maxVal) * 100}%`;
+    document.getElementById('count-INFO').textContent = infoCount;
+
+    // Set main score circle
+    const finalScore = summary.riskScore || 0;
+    const color = finalScore >= 90 ? '#ef4444' : finalScore >= 40 ? '#f97316' : '#22c55e';
+    const label = finalScore >= 90 ? 'RED' : finalScore >= 40 ? 'AMBER' : 'EMERALD';
+    
+    const scoreCircle = document.getElementById('ring-score-circle');
+    scoreCircle.textContent = (finalScore / 10).toFixed(1);
+    scoreCircle.style.background = `conic-gradient(${color} ${(finalScore / 100) * 360}deg, #1a1a24 0deg)`;
+    
+    const riskLabel = document.getElementById('card-risk-label');
+    riskLabel.textContent = label + ' GUARD';
+    riskLabel.style.color = color;
+    document.getElementById('card-risk-sub').textContent = `${totalCount} findings detected`;
+
+    const riskBadge = document.getElementById('header-risk-badge');
+    riskBadge.textContent = label + ' GUARD';
+    riskBadge.className = `risk-banner risk-${summary.riskLevel || 'SAFE'}`;
+
+    // Render findings
+    renderFindings(findings);
+
+    // ─── Forta Monitor Rendering ───
+    if (auditData?.fortaMonitor) {
+      const monitor = auditData.fortaMonitor;
+      const status = monitor.status;
+
+      document.getElementById('forta-monitor-section').style.display = 'block';
+      document.getElementById('forta-total-alerts').textContent = status.totalAlerts;
+      document.getElementById('forta-critical-alerts').textContent = status.alertsBySeverity?.CRITICAL || 0;
+      document.getElementById('forta-high-alerts').textContent = status.alertsBySeverity?.HIGH || 0;
+      
+      const rScore = status.riskScore || 0;
+      const riskEl = document.getElementById('forta-risk-score');
+      riskEl.textContent = `${rScore}%`;
+      riskEl.style.color = rScore > 80 ? '#ef4444' : rScore > 40 ? '#f97316' : '#22c55e';
+
+      // Scam Banner
+      const scamBanner = document.getElementById('scam-banner');
+      if (status.alertsBySeverity?.CRITICAL > 0 && rScore > 50) {
+        scamBanner.className = 'banner-warning';
+        scamBanner.textContent = '⚠️ SCAM DETECTOR FLAG: This address has been active in suspicious exploit or reentrancy vectors!';
+      } else {
+        scamBanner.className = 'banner-success';
+        scamBanner.textContent = '✅ Scam Detector status check: Address appears clean. No malicious history flag found.';
+      }
+
+      // Render alerts
+      const alertsContainer = document.getElementById('forta-alerts-container');
+      if (!status.recentAlerts || status.recentAlerts.length === 0) {
+        alertsContainer.innerHTML = '<div style="font-size:12px;color:var(--text2);padding:14px 0;text-align:center;">No Forta alerts found — contract appears clean ✅</div>';
+      } else {
+        const tableHtml = `
+          <table class="forta-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Severity</th>
+                <th>Source Bot</th>
+                <th>Description</th>
+                <th>Transaction</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${status.recentAlerts.map(a => `
+                <tr>
+                  <td style="color:var(--text2);font-family:'Space Mono',monospace;">${formatDate(a.createdAt)}</td>
+                  <td><span class="forta-sev-pill forta-sev-${a.severity}">${a.severity}</span></td>
+                  <td style="color:var(--accent);font-family:'Space Mono',monospace;font-size:11px;">${a.source?.bot?.name || a.source?.bot?.id?.slice(0,10)}</td>
+                  <td style="color:var(--text);">${a.description}</td>
+                  <td><a href="https://etherscan.io/tx/${a.source?.transactionHash}" target="_blank" style="color:var(--accent);text-decoration:none;font-family:'Space Mono',monospace;font-size:11px;">${a.source?.transactionHash?.slice(0,10)}...</a></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+        alertsContainer.innerHTML = tableHtml;
+      }
+
+      // ─── Forta Bot Rendering ───
+      if (monitor.generatedBot) {
+        const bot = monitor.generatedBot;
+        document.getElementById('forta-bot-section').style.display = 'block';
+        document.getElementById('bot-meta-name').textContent = bot.botName;
+        document.getElementById('bot-meta-address').textContent = bot.contractAddress;
+        document.getElementById('bot-meta-rules').textContent = bot.rules.map(r => r.ruleId).join(', ');
+
+        const tbody = document.getElementById('bot-rules-tbody');
+        tbody.innerHTML = bot.rules.map(r => `
+          <tr>
+            <td style="font-family:'Space Mono',monospace;font-weight:700;color:var(--text);">${r.ruleId}</td>
+            <td><span class="forta-sev-pill forta-sev-${r.severity}">${r.severity}</span></td>
+            <td style="color:var(--text2);">${r.description}</td>
+            <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--accent);">${r.triggerOn}</td>
+          </tr>
+        `).join('');
+
+        // Update deploy commands
+        const botDir = bot.botName.replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase() + '_monitor';
+        document.getElementById('bot-deploy-commands').textContent = `
+# 1. Navigate to the generated bot folder
+cd forta-bots/${botDir}
+
+# 2. Install Forta SDK dependencies
+npm install
+
+# 3. Run and test locally
+npx forta-agent@latest run
+
+# 4. Deploy live monitoring agent to Forta Network
+npx forta-agent@latest push
+        `.trim();
+      }
+    }
+  });
+
+  function VulnerableVaultName(addr) {
+    return addr.slice(0,6) + '...' + addr.slice(-4) + ' (Monitored)';
+  }
+
+  function formatDate(dStr) {
+    const d = new Date(dStr);
+    return isNaN(d.getTime()) ? dStr : d.toLocaleTimeString() + ' ' + d.toLocaleDateString();
+  }
+
+  function renderFindings(list) {
+    const container = document.getElementById('findings-container');
+    if (list.length === 0) {
+      container.innerHTML = '<div style="font-size:13px;color:var(--text2);text-align:center;padding:48px;">No vulnerabilities found. Smart contract is safe.</div>';
+      return;
+    }
+
+    container.innerHTML = list.map((f, idx) => `
+      <div class="finding-card" data-severity="${f.severity?.toUpperCase()}" data-tool="${f.tool}" onclick="toggleFinding(${idx})">
+        <div class="finding-header">
+          <span class="finding-sev forta-sev-${f.severity?.toUpperCase()}">${f.severity}</span>
+          <span class="finding-id">#${idx + 1}</span>
+          <div class="finding-title">${escapeHtml(f.title)}</div>
+          <span class="finding-tool">${f.tool}</span>
+          <div id="chevron-${idx}" style="font-size:11px;color:var(--text2);transition:transform 0.2s;">▼</div>
+        </div>
+        <div class="finding-body" id="body-${idx}">
+          <div class="finding-desc">${escapeHtml(f.desc || f.description)}</div>
+          <div class="finding-loc">Location: ${escapeHtml(f.loc || 'N/A')}</div>
+          ${f.vulnCode ? `<div class="card-label" style="font-size:9px;margin-bottom:4px;">Vulnerable Code Block</div><pre>${escapeHtml(f.vulnCode)}</pre>` : ''}
+          ${f.fixCode ? `<div class="finding-rec" style="margin-top:12px;"><strong>Remediation Suggestion</strong>${escapeHtml(f.fixCode)}</div>` : ''}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function toggleFinding(idx) {
+    const body = document.getElementById('body-' + idx);
+    const chevron = document.getElementById('chevron-' + idx);
+    const card = body.closest('.finding-card');
+    body.classList.toggle('show');
+    card.classList.toggle('expanded');
+    chevron.style.transform = body.classList.contains('show') ? 'rotate(180deg)' : '';
+  }
+
+  function filterFindings(filter) {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    
+    // Find active filter button based on filter string
+    const btnId = filter === 'ALL' ? 'btn-filter-all' 
+                : filter === 'CRITICAL' ? 'btn-filter-critical'
+                : filter === 'HIGH' ? 'btn-filter-high'
+                : filter === 'MEDIUM' ? 'btn-filter-medium'
+                : 'btn-filter-low';
+    
+    document.getElementById(btnId).classList.add('active');
+
+    document.querySelectorAll('.finding-card').forEach(card => {
+      const cardSev = card.dataset.severity;
+      if (filter === 'ALL') {
+        card.style.display = 'block';
+      } else {
+        card.style.display = cardSev === filter ? 'block' : 'none';
+      }
+    });
+  }
+
+  function escapeHtml(t) {
+    return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+</script>
+</body>
+</html>
