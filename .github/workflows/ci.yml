@@ -26,9 +26,9 @@ jobs:
 
     - name: Install System Dependencies (Slither & Mythril)
       run: |
-        pip3 install --upgrade pip
-        pip3 install "setuptools<60"
-        pip3 install slither-analyzer mythril
+        pip3 install --upgrade pip || true
+        pip3 install "setuptools<60" || true
+        pip3 install slither-analyzer mythril || echo "⚠️ Optional security binaries (Slither/Mythril) could not be installed. Skipping..."
 
     - name: Install Node Dependencies
       run: |
@@ -43,7 +43,10 @@ jobs:
 
     - name: Run Basic Tests
       run: |
+        # Run Jest unit tests
+        npm test
+        
         # If Hardhat test suite exists, run it
-        if [ -f "hardhat.config.js" ] || [ -f "hardhat.config.ts" ]; then
+        if [ -f "hardhat.config.js" ] || [ -f "hardhat.config.ts" ] || [ -f "hardhat.config.cjs" ]; then
           npx hardhat test
         fi

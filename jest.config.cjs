@@ -5,6 +5,7 @@ module.exports = {
   testMatch: ['**/test/**/*.test.ts'],
   testPathIgnorePatterns: [
     '/node_modules/',
+    '/cache/',
     '/AgentRegistry.test.ts',
     '/AuditBadgeNFT.test.ts',
     '/AuditJobQueue.test.ts',
