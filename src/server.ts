@@ -9,6 +9,7 @@ import { runPipeline } from './pipeline.js';
 import { SIEMEngine } from './siem/index.js';
 import type { Alert } from './siem/types.js';
 import type { ChainEvent } from './siem/types.js';
+import { parseGithubImport, findSolFiles } from './utils/github.js';
 
 // ─── SIEM Engine (singleton, shared across all routes) ───────────────────────
 const siemEngine = new SIEMEngine({ alertThreshold: 'LOW', uploadToIpfs: false });
@@ -152,8 +153,72 @@ export function startServer(port: number = 3000) {
     res.json({ ok: true, file: safeName, message: 'Audit started. Connect to /stream for live telemetry.' });
 
     runPipeline(targetFile, { ai: false }).catch((err) => {
-      console.error('[Pipeline Error]', err.message);
+      console.log('[Pipeline Error]', err.message);
     });
+  });
+
+  // ─── GitHub Import & Audit Endpoint ──────────────────────────────────────
+  app.post('/api/audit/github', async (req, res) => {
+    const { target } = req.body as { target?: string };
+
+    if (!target || typeof target !== 'string') {
+      res.status(400).json({ error: 'Missing required "target" field in request body.' });
+      return;
+    }
+
+    const gitInfo = parseGithubImport(target);
+    if (!gitInfo) {
+      res.status(400).json({ error: 'Invalid GitHub repository or target format.' });
+      return;
+    }
+
+    const cacheDir = path.join(process.cwd(), 'cache', 'github');
+    fs.mkdirSync(cacheDir, { recursive: true });
+    const repoDest = path.join(cacheDir, `${gitInfo.repoName}_${Date.now()}`);
+
+    // Immediately respond to avoid HTTP timeout issues during cloning
+    res.json({
+      ok: true,
+      message: `GitHub repository import initiated for ${gitInfo.repoName}. Connect to /stream for live audit telemetry.`
+    });
+
+    // Execute cloning and audit pipeline in background
+    (async () => {
+      try {
+        const { exec } = await import('child_process');
+        console.log(`[GitHub API] 📥 Cloning ${gitInfo.repoUrl} in background...`);
+        
+        await new Promise<void>((resolve, reject) => {
+          exec(`git clone --depth 1 ${gitInfo.repoUrl} "${repoDest}"`, (err) => {
+            if (err) reject(new Error(`Git clone failed: ${err.message}`));
+            else resolve();
+          });
+        });
+
+        console.log(`[GitHub API] ✅ Repository cloned successfully to cache.`);
+
+        let targetFiles: string[] = [];
+        if (gitInfo.filePath) {
+          const fullPath = path.join(repoDest, gitInfo.filePath);
+          if (fs.existsSync(fullPath)) {
+            targetFiles = [fullPath];
+          } else {
+            throw new Error(`Target file ${gitInfo.filePath} not found in the cloned repository.`);
+          }
+        } else {
+          targetFiles = findSolFiles(repoDest);
+        }
+
+        if (targetFiles.length === 0) {
+          throw new Error('No Solidity (.sol) files found in the repository.');
+        }
+
+        console.log(`[GitHub API] Starting audit pipeline on primary file: ${targetFiles[0]}`);
+        await runPipeline(targetFiles[0], { ai: false });
+      } catch (err: any) {
+        console.error('[GitHub API Audit Error]', err.message);
+      }
+    })();
   });
 
   // ─── SIEM REST Endpoints ─────────────────────────────────────────────────

@@ -19,6 +19,7 @@ import { runSurya } from './runners/surya.js';
 import { runPipeline } from './pipeline.js';
 import { SIEMEngine } from './siem/index.js';
 import type { ChainEvent } from './siem/types.js';
+import { parseGithubImport, findSolFiles } from './utils/github.js';
 
 dotenv.config();
 
@@ -239,11 +240,49 @@ program
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 async function resolveTarget(targetPath: string): Promise<string[]> {
+  const gitInfo = parseGithubImport(targetPath);
+  if (gitInfo) {
+    const cacheDir = path.join(process.cwd(), 'cache', 'github');
+    fs.mkdirSync(cacheDir, { recursive: true });
+    const repoDest = path.join(cacheDir, gitInfo.repoName);
+
+    // Re-clone fresh to ensure the latest contract state is audited
+    if (fs.existsSync(repoDest)) {
+      console.log(`[GitHub] 🧹 Clearing stale cached copy of: ${gitInfo.repoName}`);
+      fs.rmSync(repoDest, { recursive: true, force: true });
+    }
+
+    console.log(`[GitHub] 📥 Importing repository: ${gitInfo.repoUrl}`);
+    const { execSync } = await import('child_process');
+    try {
+      execSync(`git clone --depth 1 ${gitInfo.repoUrl} "${repoDest}"`, { stdio: 'pipe' });
+      console.log(`[GitHub] ✅ Repository cloned successfully to cache.`);
+    } catch (err: any) {
+      throw new Error(`Failed to clone GitHub repository: ${err.message}`);
+    }
+
+    if (gitInfo.filePath) {
+      const fullPath = path.join(repoDest, gitInfo.filePath);
+      if (!fs.existsSync(fullPath)) {
+        throw new Error(`Specified contract file not found in repository: ${gitInfo.filePath}`);
+      }
+      return [fullPath];
+    } else {
+      const solFiles = findSolFiles(repoDest);
+      if (solFiles.length === 0) {
+        throw new Error(`No Solidity (.sol) files found in the cloned repository.`);
+      }
+      console.log(`[GitHub] 🔎 Found ${solFiles.length} Solidity files recursively.`);
+      return solFiles;
+    }
+  }
+
+  // Local fallback
   const abs = path.resolve(targetPath);
   if (!fs.existsSync(abs)) throw new Error(`Path not found: ${abs}`);
   const stat = fs.statSync(abs);
   if (stat.isDirectory()) {
-    return fs.readdirSync(abs).filter(f => f.endsWith('.sol')).map(f => path.join(abs, f));
+    return findSolFiles(abs);
   }
   return [abs];
 }
