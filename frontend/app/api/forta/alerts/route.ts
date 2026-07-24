@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+export const dynamic = 'force-static';
+
 let FORTA_ALERTS: any[] = [
   {
     alert_id: 'FORTA-ALERT-892104',

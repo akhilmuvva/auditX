@@ -2,6 +2,12 @@ import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 
+export const dynamic = 'force-static';
+
+export function generateStaticParams() {
+  return [{ id: 'clean' }, { id: 'reentrancy' }, { id: 'fullstack' }];
+}
+
 const REPORTS_CACHE_DIR = path.join(process.cwd(), '..', 'reports-cache');
 
 export async function GET(

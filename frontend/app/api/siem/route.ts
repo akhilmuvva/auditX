@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+export const dynamic = 'force-static';
+
 // In-memory SIEM telemetry event store for real-time monitoring
 let SIEM_EVENTS: any[] = [
   {

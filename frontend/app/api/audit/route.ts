@@ -3,6 +3,8 @@ import { exec } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
+export const dynamic = 'force-static';
+
 // Store temporary reports in memory/disk for demonstration
 const REPORTS_CACHE_DIR = path.join(process.cwd(), '..', 'reports-cache');
 if (!fs.existsSync(REPORTS_CACHE_DIR)) {
@@ -160,8 +162,8 @@ export async function POST(request: Request) {
             pipeline_duration_ms: 1200
           };
           fs.writeFileSync(reportPath, JSON.stringify(mockReport, null, 2));
-        }
-        resolve();
+          resolve();
+        });
       });
     });
 

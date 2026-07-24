@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 
+export const dynamic = 'force-static';
+
 export async function POST(request: Request) {
   try {
     const text = await request.text();
