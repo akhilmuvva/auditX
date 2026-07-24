@@ -7,7 +7,6 @@ const basePath = isGithubActions ? `/${repo}` : '';
 const nextConfig: NextConfig = {
   output: "export",
   basePath,
-  assetPrefix: isGithubActions ? `/${repo}/` : undefined,
   images: {
     unoptimized: true,
   },
