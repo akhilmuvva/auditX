@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -40,15 +40,26 @@ jobs:
           npm ci
 
       - name: Build Static App Export
+        env:
+          GITHUB_ACTIONS: "true"
         run: |
           cd frontend
           npm run build
+
+      - name: Add .nojekyll file
+        run: touch frontend/out/.nojekyll
+
+      - name: Deploy to gh-pages branch
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: frontend/out
+          branch: gh-pages
 
       - name: Upload Pages Artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: 'frontend/out'
 
-      - name: Deploy to GitHub Pages
+      - name: Deploy to GitHub Pages Action
         id: deployment
         uses: actions/deploy-pages@v4
