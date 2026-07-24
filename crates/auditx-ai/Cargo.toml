@@ -1,0 +1,13 @@
+[package]
+name = "auditx-ai"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+auditx-core = { path = "../auditx-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+reqwest = { workspace = true }
+tokio = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }

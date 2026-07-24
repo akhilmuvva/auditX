@@ -1,0 +1,19 @@
+type AuditRecord = record {
+    contract_address: text;
+    web3_cvss: float32;
+    web2_cvss: float32;
+    combined_cvss: float32;
+    eas_uid: text;
+    ipfs_cid: text;
+    badge_token_id: opt nat64;
+    timestamp: nat64;
+    chain_count: nat32;
+    auditor: principal;
+};
+
+service : {
+    store_audit: (text, AuditRecord) -> ();
+    get_audit: (text) -> (opt AuditRecord) query;
+    get_all: () -> (vec record { text; AuditRecord }) query;
+    get_by_cvss: (float32) -> (vec record { text; AuditRecord }) query;
+}

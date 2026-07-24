@@ -1,0 +1,22 @@
+{
+  "canisters": {
+    "auditx_canister": {
+      "type": "custom",
+      "candid": "crates/auditx-canister/src/lib.did",
+      "wasm": "target/wasm32-unknown-unknown/release/auditx_canister.wasm",
+      "build": "/root/.cargo/bin/cargo build --target wasm32-unknown-unknown --release -p auditx-canister",
+      "metadata": [
+        {
+          "name": "candid:service"
+        }
+      ]
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  },
+  "output_env_file": ".env"
+}

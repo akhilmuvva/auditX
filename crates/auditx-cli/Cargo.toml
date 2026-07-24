@@ -1,0 +1,28 @@
+[package]
+name = "auditx-cli"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+auditx-core = { path = "../auditx-core" }
+auditx-web3 = { path = "../auditx-web3" }
+auditx-web2 = { path = "../auditx-web2" }
+auditx-ai = { path = "../auditx-ai" }
+auditx-trust = { path = "../auditx-trust" }
+clap = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = "0.3"
+glob = "0.3"
+alloy = { version = "0.1", features = ["full", "providers", "signers"] }
+dotenv = "0.15"
+
+[[bench]]
+name = "pipeline"
+harness = false
+
+[dev-dependencies]
+criterion = "0.5"

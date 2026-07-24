@@ -1,0 +1,12 @@
+[package]
+name = "auditx-canister"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+ic-cdk = "0.13"
+candid = "0.10"
+serde = { workspace = true }

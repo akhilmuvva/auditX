@@ -1,52 +1,58 @@
-name: AuditX CI Pipeline
+name: Rust CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ main ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ main ]
+
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
-  build-and-test:
+  test:
     runs-on: ubuntu-latest
-    
     steps:
     - uses: actions/checkout@v4
-
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
+    - name: Set up Rust
+      uses: dtolnay/rust-toolchain@stable
+    - name: Cache dependencies
+      uses: actions/cache@v4
       with:
-        node-version: '20'
-        cache: 'npm'
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+    - name: Run tests
+      run: cargo test --workspace
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Rust
+      uses: dtolnay/rust-toolchain@stable
       with:
-        python-version: '3.10'
+        components: clippy
+    - name: Cache dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+    - name: Run clippy
+      run: cargo clippy --workspace -- -D warnings
 
-    - name: Install System Dependencies (Slither & Mythril)
-      run: |
-        pip3 install --upgrade pip || true
-        pip3 install "setuptools<60" || true
-        pip3 install slither-analyzer mythril || echo "⚠️ Optional security binaries (Slither/Mythril) could not be installed. Skipping..."
-
-    - name: Install Node Dependencies
-      run: |
-        npm ci
-        npm install -g surya
-
-    - name: Build Dashboard
-      run: |
-        cd dashboard
-        npm ci
-        npm run build
-
-    - name: Run Basic Tests
-      run: |
-        # Run Jest unit tests
-        npm test
-        
-        # If Hardhat test suite exists, run it
-        if [ -f "hardhat.config.js" ] || [ -f "hardhat.config.ts" ] || [ -f "hardhat.config.cjs" ]; then
-          npx hardhat test
-        fi
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt
+    - name: Check formatting
+      run: cargo fmt --all -- --check

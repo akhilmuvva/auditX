@@ -1,8 +1,14 @@
 # Dependencies
 node_modules/
+frontend/node_modules/
 
-# Local audit reports
+# Local audit reports & cache
 auditx-reports/
+reports-cache/
+.dfx/
+target/
+.next/
+frontend/.next/
 
 # OS-specific files
 .DS_Store
@@ -15,3 +21,4 @@ dist/
 
 # Env files
 .env
+.env.local

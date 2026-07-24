@@ -1,0 +1,29 @@
+[workspace]
+members = [
+  "crates/auditx-core",
+  "crates/auditx-web3",
+  "crates/auditx-web2",
+  "crates/auditx-ai",
+  "crates/auditx-trust",
+  "crates/auditx-cli",
+  "crates/auditx-canister",
+]
+resolver = "2"
+
+[workspace.dependencies]
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
+thiserror = "1"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+clap        = { version = "4",    features = ["derive"] }
+regex       = "1"
+sha2        = "0.10"
+bs58        = "0.5"
+alloy       = { version = "0.1",  features = ["full"] }
+ic-cdk      = "0.13"
+candid      = "0.10"
+tera        = "1"
