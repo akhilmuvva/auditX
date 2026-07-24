@@ -1,0 +1,1 @@
+self.__SSG_MANIFEST=new Set(["\u002Fapi\u002Faudit\u002F[id]","\u002Fapi\u002Fbadge\u002F[id]","\u002Fbadge\u002F[tokenId]","\u002Freport\u002F[id]"]);self.__SSG_MANIFEST_CB&&self.__SSG_MANIFEST_CB()
