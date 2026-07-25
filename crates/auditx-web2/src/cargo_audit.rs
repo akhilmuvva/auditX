@@ -41,7 +41,6 @@ impl CargoAuditEngine {
             }
             Err(_) => {
                 warn!("cargo-audit execution timed out.");
-                let _ = child.kill().await;
                 return Ok(vec![]);
             }
         };

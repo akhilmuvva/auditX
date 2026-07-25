@@ -72,6 +72,21 @@ enum Commands {
         #[arg(short, long)]
         dir: PathBuf,
     },
+    Client {
+        #[command(subcommand)]
+        subcommand: ClientCommands,
+    },
+}
+
+#[derive(Subcommand)]
+enum ClientCommands {
+    Register {
+        #[arg(long, help = "Name of the client application (e.g. polylance)")]
+        name: String,
+        
+        #[arg(long, help = "Webhook URL to receive HMAC-signed alert notifications")]
+        webhook_url: String,
+    },
 }
 
 #[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
@@ -215,7 +230,7 @@ async fn main() -> Result<()> {
             // Calculate totals
             let all_severities: Vec<&Severity> = report.web3_findings.iter().map(|f| &f.severity)
                 .chain(report.web2_findings.iter().map(|f| &f.severity))
-                .chain(report.secret_findings.iter().map(|f| &f.severity))
+                .chain(report.secret_findings.iter().map(|_| &Severity::High))
                 .chain(report.dependency_findings.iter().map(|f| &f.severity))
                 .collect();
 
@@ -317,7 +332,7 @@ async fn main() -> Result<()> {
         }
         Commands::Secrets { dir } => {
             info!("Scanning directory {:?} for secrets...", dir);
-            let secrets = auditx_web2::secrets::scan_directory_for_secrets(&dir);
+            let secrets = auditx_web2::secrets::detect_secrets(&dir).unwrap_or_default();
             println!("{}", serde_json::to_string_pretty(&secrets)?);
         }
         Commands::Deps { dir } => {
@@ -333,6 +348,36 @@ async fn main() -> Result<()> {
                 deps.extend(n_findings);
             }
             println!("{}", serde_json::to_string_pretty(&deps)?);
+        }
+        Commands::Client { subcommand } => {
+            match subcommand {
+                ClientCommands::Register { name, webhook_url } => {
+                    let registry = auditx_core::MultiTenantRegistry::new();
+                    let (client, raw_api_key, webhook_secret) = registry.register_client(&name, &webhook_url);
+                    println!(r#"
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ AuditX SIEM Client Registration
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ Client Name:    {}
+ Client ID:      {}
+ Webhook URL:    {}
+ Created At:     {}
+
+ 🔑 API KEY (save now, never shown again):
+    {}
+
+ 🔐 WEBHOOK SECRET (use to verify X-AuditX-Signature):
+    {}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"#,
+                        client.name,
+                        client.id,
+                        client.webhook_url,
+                        client.created_at,
+                        raw_api_key,
+                        webhook_secret
+                    );
+                }
+            }
         }
     }
 

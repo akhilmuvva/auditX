@@ -48,7 +48,6 @@ impl SemgrepEngine {
                 }
                 Err(_) => {
                     warn!("Semgrep execution timed out for config {} after {} seconds.", config, self.timeout_secs);
-                    let _ = child.kill().await;
                     continue;
                 }
             };

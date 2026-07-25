@@ -32,7 +32,7 @@ impl SuryaEngine {
 
         let dot_child = Command::new("dot")
             .arg("-Tsvg")
-            .stdin(Stdio::from(surya_stdout))
+            .stdin(Stdio::from(surya_stdout.into_owned_fd().unwrap()))
             .stdout(Stdio::piped())
             .spawn();
 

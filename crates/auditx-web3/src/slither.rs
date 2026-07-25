@@ -45,7 +45,6 @@ impl SlitherEngine {
             }
             Err(_) => {
                 warn!("Slither execution timed out after {} seconds.", self.timeout_secs);
-                let _ = child.kill().await;
                 return Ok(vec![]);
             }
         };

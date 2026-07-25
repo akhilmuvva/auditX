@@ -41,7 +41,6 @@ impl NpmAuditEngine {
             }
             Err(_) => {
                 warn!("npm audit execution timed out.");
-                let _ = child.kill().await;
                 return Ok(vec![]);
             }
         };
@@ -101,7 +100,7 @@ impl NpmAuditEngine {
         let package_json_path = project_dir.join("package.json");
         if package_json_path.exists() {
             if let Ok(data) = std::fs::read_to_string(package_json_path) {
-                if let Ok(json) = serde_json::Value::from_str(&data) {
+                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&data) {
                     if let Some(deps) = json.get("dependencies").and_then(|d| d.as_object()) {
                         for (dep, ver) in deps {
                             let ver_str = ver.as_str().unwrap_or("");

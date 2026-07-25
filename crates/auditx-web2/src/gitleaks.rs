@@ -51,7 +51,6 @@ impl GitleaksEngine {
             }
             Err(_) => {
                 warn!("Gitleaks execution timed out.");
-                let _ = child.kill().await;
                 let _ = tokio::fs::remove_file(&temp_report_path).await;
                 return Ok(vec![]);
             }

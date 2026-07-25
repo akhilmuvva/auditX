@@ -56,9 +56,9 @@ pub async fn mint_badge(
     .context("Failed to get transaction receipt for mintBadge")?;
 
     // Parse logs for BadgeMinted event
-    for log in &tx_receipt.inner.logs {
+    for log in tx_receipt.inner.logs() {
         if let Ok(event) = log.log_decode::<IAuditBadgeNFT::BadgeMinted>() {
-            let token_id = event.tokenId.to::<u64>();
+            let token_id = event.inner.data.tokenId.to::<u64>();
             info!("Successfully minted badge token ID: {}", token_id);
             return Ok(Some(token_id));
         }
