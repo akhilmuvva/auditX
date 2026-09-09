@@ -2,12 +2,13 @@
 pragma solidity 0.8.20;
 
 import "./AgentRegistry.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * @title AuditRegistry
  * @dev Immutable audit result log — core of the decentralized network
  */
-contract AuditRegistry {
+contract AuditRegistry is Ownable {
     AgentRegistry public agentRegistry;
     address public disputeResolver;
 
@@ -39,14 +40,16 @@ contract AuditRegistry {
         _;
     }
 
-    constructor(address _agentRegistry, address _disputeResolver) {
+    constructor(address _agentRegistry, address _disputeResolver) Ownable(msg.sender) {
+        require(_agentRegistry != address(0), "Invalid agent registry");
         agentRegistry = AgentRegistry(_agentRegistry);
-        disputeResolver = _disputeResolver;
+        if (_disputeResolver != address(0)) {
+            disputeResolver = _disputeResolver;
+        }
     }
 
-    function setDisputeResolver(address _disputeResolver) external {
-        // In a real system, this would be behind a timelock DAO vote
-        // Assuming deployer sets it once, but we'll use a simple check
+    function setDisputeResolver(address _disputeResolver) external onlyOwner {
+        require(_disputeResolver != address(0), "Invalid dispute resolver");
         require(disputeResolver == address(0), "DisputeResolver already set");
         disputeResolver = _disputeResolver;
     }

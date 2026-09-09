@@ -20,29 +20,42 @@ pub enum StoreError {
 /// Abstract persistence layer for SIWE identity security state
 #[async_trait]
 pub trait IdentityStore: Send + Sync {
-    /// Check whether a SIWE nonce has already been consumed
-    async fn seen_nonce(&self, nonce: &str) -> Result<bool, StoreError>;
-
-    /// Mark a SIWE nonce as consumed with a TTL window
-    async fn mark_nonce_used(&self, nonce: &str, ttl_secs: u64) -> Result<(), StoreError>;
+    /// Atomically consume a SIWE nonce, returning false if it is already active.
+    async fn consume_nonce(&self, nonce: &str, ttl_secs: u64) -> Result<bool, StoreError>;
 
     /// Retrieve the historical behavioral baseline for a wallet
     async fn get_baseline(&self, wallet: &Address) -> Result<Option<WalletBaseline>, StoreError>;
 
     /// Persist the updated behavioral baseline for a wallet
-    async fn save_baseline(&self, wallet: &Address, baseline: &WalletBaseline) -> Result<(), StoreError>;
+    async fn save_baseline(
+        &self,
+        wallet: &Address,
+        baseline: &WalletBaseline,
+    ) -> Result<(), StoreError>;
 
     /// Retrieve recent login attempt timestamps for velocity tracking
-    async fn recent_attempts(&self, wallet_or_ip: &str, window_secs: u32) -> Result<Vec<DateTime<Utc>>, StoreError>;
+    async fn recent_attempts(
+        &self,
+        wallet_or_ip: &str,
+        window_secs: u32,
+    ) -> Result<Vec<DateTime<Utc>>, StoreError>;
 
     /// Record a login attempt timestamp
-    async fn record_attempt(&self, wallet_or_ip: &str, at: DateTime<Utc>) -> Result<(), StoreError>;
+    async fn record_attempt(&self, wallet_or_ip: &str, at: DateTime<Utc>)
+        -> Result<(), StoreError>;
 
     /// Retrieve cached first on-chain activity timestamp
-    async fn get_wallet_first_seen(&self, wallet: &Address) -> Result<Option<DateTime<Utc>>, StoreError>;
+    async fn get_wallet_first_seen(
+        &self,
+        wallet: &Address,
+    ) -> Result<Option<DateTime<Utc>>, StoreError>;
 
     /// Cache first on-chain activity timestamp indefinitely
-    async fn save_wallet_first_seen(&self, wallet: &Address, first_seen: DateTime<Utc>) -> Result<(), StoreError>;
+    async fn save_wallet_first_seen(
+        &self,
+        wallet: &Address,
+        first_seen: DateTime<Utc>,
+    ) -> Result<(), StoreError>;
 }
 
 /// In-memory implementation of IdentityStore for development, testing, and single-node setups
@@ -67,21 +80,14 @@ impl InMemoryStore {
 
 #[async_trait]
 impl IdentityStore for InMemoryStore {
-    async fn seen_nonce(&self, nonce: &str) -> Result<bool, StoreError> {
-        let map = self.nonces.read().await;
-        if let Some(exp) = map.get(nonce) {
-            if *exp > Utc::now() {
-                return Ok(true);
-            }
-        }
-        Ok(false)
-    }
-
-    async fn mark_nonce_used(&self, nonce: &str, ttl_secs: u64) -> Result<(), StoreError> {
+    async fn consume_nonce(&self, nonce: &str, ttl_secs: u64) -> Result<bool, StoreError> {
         let mut map = self.nonces.write().await;
+        if map.get(nonce).is_some_and(|exp| *exp > Utc::now()) {
+            return Ok(false);
+        }
         let expires_at = Utc::now() + chrono::Duration::seconds(ttl_secs as i64);
         map.insert(nonce.to_string(), expires_at);
-        Ok(())
+        Ok(true)
     }
 
     async fn get_baseline(&self, wallet: &Address) -> Result<Option<WalletBaseline>, StoreError> {
@@ -90,27 +96,40 @@ impl IdentityStore for InMemoryStore {
         Ok(map.get(&key).cloned())
     }
 
-    async fn save_baseline(&self, wallet: &Address, baseline: &WalletBaseline) -> Result<(), StoreError> {
+    async fn save_baseline(
+        &self,
+        wallet: &Address,
+        baseline: &WalletBaseline,
+    ) -> Result<(), StoreError> {
         let key = wallet_key(wallet);
         let mut map = self.baselines.write().await;
         map.insert(key, baseline.clone());
         Ok(())
     }
 
-    async fn recent_attempts(&self, wallet_or_ip: &str, window_secs: u32) -> Result<Vec<DateTime<Utc>>, StoreError> {
+    async fn recent_attempts(
+        &self,
+        wallet_or_ip: &str,
+        window_secs: u32,
+    ) -> Result<Vec<DateTime<Utc>>, StoreError> {
         let map = self.attempts.read().await;
         let now = Utc::now();
         let cutoff = now - chrono::Duration::seconds(window_secs as i64);
 
         if let Some(list) = map.get(wallet_or_ip) {
-            let filtered: Vec<DateTime<Utc>> = list.iter().filter(|&&t| t >= cutoff).cloned().collect();
+            let filtered: Vec<DateTime<Utc>> =
+                list.iter().filter(|&&t| t >= cutoff).cloned().collect();
             Ok(filtered)
         } else {
             Ok(Vec::new())
         }
     }
 
-    async fn record_attempt(&self, wallet_or_ip: &str, at: DateTime<Utc>) -> Result<(), StoreError> {
+    async fn record_attempt(
+        &self,
+        wallet_or_ip: &str,
+        at: DateTime<Utc>,
+    ) -> Result<(), StoreError> {
         let mut map = self.attempts.write().await;
         let entry = map.entry(wallet_or_ip.to_string()).or_insert_with(Vec::new);
         entry.push(at);
@@ -120,13 +139,20 @@ impl IdentityStore for InMemoryStore {
         Ok(())
     }
 
-    async fn get_wallet_first_seen(&self, wallet: &Address) -> Result<Option<DateTime<Utc>>, StoreError> {
+    async fn get_wallet_first_seen(
+        &self,
+        wallet: &Address,
+    ) -> Result<Option<DateTime<Utc>>, StoreError> {
         let key = wallet_key(wallet);
         let map = self.wallet_age_cache.read().await;
         Ok(map.get(&key).cloned())
     }
 
-    async fn save_wallet_first_seen(&self, wallet: &Address, first_seen: DateTime<Utc>) -> Result<(), StoreError> {
+    async fn save_wallet_first_seen(
+        &self,
+        wallet: &Address,
+        first_seen: DateTime<Utc>,
+    ) -> Result<(), StoreError> {
         let key = wallet_key(wallet);
         let mut map = self.wallet_age_cache.write().await;
         map.insert(key, first_seen);
@@ -145,7 +171,8 @@ mod tests {
 
         // One lowercase address, one checksum-cased address representing the SAME account
         let addr_lower = Address::from_str("0xd8da6bf26964af9d7eed9e03e53415d37aa96045").unwrap();
-        let addr_checksum = Address::from_str("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045").unwrap();
+        let addr_checksum =
+            Address::from_str("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045").unwrap();
 
         // Confirm wallet_key formats identically
         assert_eq!(wallet_key(&addr_lower), wallet_key(&addr_checksum));
@@ -162,8 +189,19 @@ mod tests {
 
         // Test wallet age cache with case variance
         let test_time = Utc::now();
-        store.save_wallet_first_seen(&addr_checksum, test_time).await.unwrap();
+        store
+            .save_wallet_first_seen(&addr_checksum, test_time)
+            .await
+            .unwrap();
         let age_retrieved = store.get_wallet_first_seen(&addr_lower).await.unwrap();
         assert_eq!(age_retrieved, Some(test_time));
+    }
+
+    #[tokio::test]
+    async fn test_nonce_consumption_is_atomic() {
+        let store = InMemoryStore::new();
+
+        assert!(store.consume_nonce("nonce", 600).await.unwrap());
+        assert!(!store.consume_nonce("nonce", 600).await.unwrap());
     }
 }

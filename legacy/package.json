@@ -32,6 +32,8 @@
     "@libp2p/peer-id-factory": "^4.2.4",
     "@libp2p/tcp": "^9.1.6",
     "@lit-protocol/lit-node-client": "^6.11.5",
+    "@noble/curves": "^1.9.7",
+    "@noble/hashes": "^1.8.0",
     "@solidity-parser/parser": "^0.18.0",
     "bull": "^4.16.5",
     "commander": "^14.0.3",

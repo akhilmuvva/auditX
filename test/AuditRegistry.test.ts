@@ -49,6 +49,21 @@ describe("AuditRegistry", function () {
     ).to.be.revertedWith("Not an active registered agent");
   });
 
+  it("Should restrict one-time resolver initialization to the owner", async function () {
+    const AuditRegistry = await ethers.getContractFactory("AuditRegistry");
+    const uninitialized = await AuditRegistry.deploy(await agentRegistry.getAddress(), ethers.ZeroAddress);
+    await uninitialized.waitForDeployment();
+
+    await expect(
+      uninitialized.connect(nonAgent).setDisputeResolver(disputeResolver.address)
+    ).to.be.revertedWithCustomError(uninitialized, "OwnableUnauthorizedAccount");
+
+    await uninitialized.setDisputeResolver(disputeResolver.address);
+    expect(await uninitialized.disputeResolver()).to.equal(disputeResolver.address);
+    await expect(uninitialized.setDisputeResolver(treasury.address))
+      .to.be.revertedWith("DisputeResolver already set");
+  });
+
   it("Should allow raising and resolving a dispute", async function () {
     const contractHash = ethers.id("test_contract");
     await auditRegistry.connect(agent1).submitAudit(contractHash, "QmTest123", 75, 2);

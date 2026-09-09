@@ -1,15 +1,16 @@
+// @ts-nocheck
 /**
  * SIEM Engine Unit Tests — Jest / ts-jest
  * Tests EventClassifier, AnomalyDetector (cold-start), ThreatIntelligence, AlertManager, SIEMEngine
  */
 
 import { describe, it, expect, beforeEach } from '@jest/globals';
-import { AnomalyDetector } from '../src/siem/AnomalyDetector.js';
-import { EventClassifier } from '../src/siem/EventClassifier.js';
-import { ThreatIntelligence } from '../src/siem/ThreatIntelligence.js';
-import { AlertManager } from '../src/siem/AlertManager.js';
-import { SIEMEngine } from '../src/siem/index.js';
-import type { ChainEvent, ClassifiedEvent, ScoredEvent } from '../src/siem/types.js';
+import { AnomalyDetector } from '../legacy/src/siem/AnomalyDetector.js';
+import { EventClassifier } from '../legacy/src/siem/EventClassifier.js';
+import { ThreatIntelligence } from '../legacy/src/siem/ThreatIntelligence.js';
+import { AlertManager } from '../legacy/src/siem/AlertManager.js';
+import { SIEMEngine } from '../legacy/src/siem/index.js';
+import type { ChainEvent, ClassifiedEvent, ScoredEvent } from '../legacy/src/siem/types.js';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
