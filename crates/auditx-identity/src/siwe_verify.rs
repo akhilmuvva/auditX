@@ -20,8 +20,13 @@ pub enum SiweVerificationError {
     #[error("Cryptographic signature verification failed: recovered address mismatch or invalid ECDSA signature")]
     SignatureVerificationFailed,
 
-    #[error("Domain mismatch: expected domain '{expected}', but message was signed for '{actual}'")]
+    #[error(
+        "Domain mismatch: expected domain '{expected}', but message was signed for '{actual}'"
+    )]
     DomainMismatch { expected: String, actual: String },
+
+    #[error("SIWE message is missing a required expiration time")]
+    MissingExpiration,
 
     #[error("SIWE message has expired at {0}")]
     MessageExpired(String),
@@ -60,16 +65,28 @@ pub async fn verify_siwe_login(
     if let Some(ref exp) = message.expiration_time {
         let exp_utc = chrono::DateTime::parse_from_rfc3339(&exp.to_string())
             .map(|dt| dt.with_timezone(&Utc))
-            .map_err(|e| SiweVerificationError::MalformedMessage(format!("Invalid expiration timestamp: {}", e)))?;
+            .map_err(|e| {
+                SiweVerificationError::MalformedMessage(format!(
+                    "Invalid expiration timestamp: {}",
+                    e
+                ))
+            })?;
         if now > exp_utc {
             return Err(SiweVerificationError::MessageExpired(exp.to_string()));
         }
+    } else {
+        return Err(SiweVerificationError::MissingExpiration);
     }
 
     if let Some(ref nbf) = message.not_before {
         let nbf_utc = chrono::DateTime::parse_from_rfc3339(&nbf.to_string())
             .map(|dt| dt.with_timezone(&Utc))
-            .map_err(|e| SiweVerificationError::MalformedMessage(format!("Invalid not_before timestamp: {}", e)))?;
+            .map_err(|e| {
+                SiweVerificationError::MalformedMessage(format!(
+                    "Invalid not_before timestamp: {}",
+                    e
+                ))
+            })?;
         if now < nbf_utc {
             return Err(SiweVerificationError::MessageNotYetValid(nbf.to_string()));
         }
@@ -77,28 +94,30 @@ pub async fn verify_siwe_login(
 
     // 4. Nonce Replay Defense (Check if nonce was already consumed)
     let nonce = &message.nonce;
-    let seen = store.seen_nonce(nonce).await
-        .map_err(|e| SiweVerificationError::StoreFailure(e.to_string()))?;
-    if seen {
-        return Err(SiweVerificationError::NonceReplayed(nonce.clone()));
-    }
-
     // 5. Signature Verification (Recover signer & compare)
     let sig_hex = req.signature.trim_start_matches("0x");
     let sig_bytes = hex::decode(sig_hex)
         .map_err(|e| SiweVerificationError::InvalidSignatureFormat(e.to_string()))?;
-    let sig_array: &[u8; 65] = sig_bytes.as_slice().try_into()
-        .map_err(|_| SiweVerificationError::InvalidSignatureFormat(
-            format!("Expected 65-byte signature, got {} bytes", sig_bytes.len())
-        ))?;
+    let sig_array: &[u8; 65] = sig_bytes.as_slice().try_into().map_err(|_| {
+        SiweVerificationError::InvalidSignatureFormat(format!(
+            "Expected 65-byte signature, got {} bytes",
+            sig_bytes.len()
+        ))
+    })?;
 
     // Verify signature with EIP-191 via siwe crate
-    message.verify_eip191(sig_array)
+    message
+        .verify_eip191(sig_array)
         .map_err(|_| SiweVerificationError::SignatureVerificationFailed)?;
 
     // 6. Mark Nonce as Used
-    store.mark_nonce_used(nonce, nonce_ttl_secs).await
+    let consumed = store
+        .consume_nonce(nonce, nonce_ttl_secs)
+        .await
         .map_err(|e| SiweVerificationError::StoreFailure(e.to_string()))?;
+    if !consumed {
+        return Err(SiweVerificationError::NonceReplayed(nonce.clone()));
+    }
 
     // 7. Hash Client IP (Never store raw IP)
     let mut hasher = Sha256::new();

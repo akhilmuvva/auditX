@@ -36,6 +36,7 @@ interface SIEMStore {
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 const DEFAULT_WS_URL = `${API_URL.replace(/^http/, 'ws')}/ws/siem`;
+const SIEM_API_KEY = import.meta.env.VITE_SIEM_API_KEY as string | undefined;
 
 // ─── Store ────────────────────────────────────────────────────────────────────
 
@@ -54,7 +55,7 @@ export const useSIEMStore = create<SIEMStore>((set, get) => ({
 
     set({ wsStatus: 'connecting' });
 
-    const ws = new WebSocket(url);
+    const ws = new WebSocket(url, SIEM_API_KEY ? [`auditx-api-key.${SIEM_API_KEY}`] : undefined);
 
     ws.onopen = () => set({ wsStatus: 'connected' });
 

@@ -1,15 +1,23 @@
 import express from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import { WebSocketServer, WebSocket } from 'ws';
+import { timingSafeEqual } from 'crypto';
 import { createServer } from 'http';
 import { auditEmitter } from './events.js';
-import { runPipeline } from './pipeline.js';
 import { SIEMEngine } from './siem/index.js';
 import type { Alert } from './siem/types.js';
 import type { ChainEvent } from './siem/types.js';
 import { parseGithubImport, findSolFiles } from './utils/github.js';
+import {
+  bootstrapPolyLance,
+  eventMatchesMonitoredAddress,
+  TenantRegistry,
+  type IssuedClientCredentials,
+  type MonitoredAddress,
+} from './tenantRegistry.js';
 
 // ─── SIEM Engine (singleton, shared across all routes) ───────────────────────
 const siemEngine = new SIEMEngine({ alertThreshold: 'LOW', uploadToIpfs: false });
@@ -20,13 +28,82 @@ siemEngine.train([]).then(() => {
 
 // Track ongoing scans per client session
 const activeSessions = new Map<string, boolean>();
+const tenantRegistry = new TenantRegistry();
+bootstrapPolyLance(tenantRegistry);
+
+function hasApiAccess(req: Pick<Request, 'headers'> & { url?: string }): boolean {
+  const expected = process.env.AUDITX_API_TOKEN;
+  if (!expected) return false;
+  const authorization = Array.isArray(req.headers.authorization)
+    ? req.headers.authorization[0]
+    : req.headers.authorization;
+  const apiKey = Array.isArray(req.headers['x-api-key'])
+    ? req.headers['x-api-key'][0]
+    : req.headers['x-api-key'];
+  const websocketProtocol = typeof req.headers['sec-websocket-protocol'] === 'string'
+    ? req.headers['sec-websocket-protocol'].split(',').map((value) => value.trim())
+      .find((value) => value.startsWith('auditx-api-key.'))?.slice('auditx-api-key.'.length)
+    : undefined;
+  const supplied = authorization?.startsWith('Bearer ')
+    ? authorization.slice(7)
+    : apiKey || websocketProtocol || undefined;
+  if (!supplied) return false;
+  if (tenantRegistry.authenticate(supplied)) return true;
+  if (!expected) return false;
+  const expectedBuffer = Buffer.from(expected);
+  const suppliedBuffer = Buffer.from(supplied);
+  return expectedBuffer.length === suppliedBuffer.length && timingSafeEqual(expectedBuffer, suppliedBuffer);
+}
+
+async function dispatchMatchingWebhooks(alerts: Alert[]): Promise<void> {
+  for (const alert of alerts) {
+    const monitored = tenantRegistry.lookupAddress(alert.event.contractAddress);
+    for (const registration of monitored) {
+      if (registration.owningApp === 'PolyLance' && eventMatchesMonitoredAddress(alert.event, registration)) {
+        try {
+          await tenantRegistry.dispatchAlert(registration, alert);
+        } catch (error) {
+          console.error(`[SIEM] Webhook delivery failed for ${registration.owningApp}:`, error instanceof Error ? error.message : 'unknown error');
+        }
+      }
+    }
+  }
+}
+
+function requireApiAccess(req: Request, res: Response, next: NextFunction) {
+  if (!hasApiAccess(req)) {
+    res.status(401).json({ error: 'SIEM API authentication required.' });
+    return;
+  }
+  next();
+}
+
+function isValidChainEvent(value: unknown): value is ChainEvent {
+  if (!value || typeof value !== 'object') return false;
+  const event = value as Partial<ChainEvent>;
+  return typeof event.id === 'string' && event.id.length <= 256
+    && Number.isSafeInteger(event.timestamp) && typeof event.chainId === 'number'
+    && typeof event.contractAddress === 'string' && typeof event.txHash === 'string'
+    && Number.isSafeInteger(event.blockNumber) && typeof event.eventName === 'string'
+    && typeof event.args === 'object' && event.args !== null
+    && typeof event.gasUsed === 'number' && typeof event.callValue === 'string'
+    && typeof event.from === 'string';
+}
+
+function validateEvents(events: unknown): events is ChainEvent[] {
+  return Array.isArray(events) && events.length > 0 && events.length <= 1000 && events.every(isValidChainEvent);
+}
 
 export function startServer(port: number = 3000) {
   const app = express();
   const httpServer = createServer(app);
 
   // ─── WebSocket Server (for SIEM live alerts) ─────────────────────────────
-  const wss = new WebSocketServer({ server: httpServer, path: '/ws/siem' });
+  const wss = new WebSocketServer({
+    server: httpServer,
+    path: '/ws/siem',
+    handleProtocols: (protocols) => [...protocols].find((protocol) => protocol.startsWith('auditx-api-key.')) || '',
+  });
 
   /** Broadcast an alert to all connected SIEM dashboard clients */
   function broadcastAlert(alert: Alert) {
@@ -53,7 +130,11 @@ export function startServer(port: number = 3000) {
     broadcastAlert(alert);
   });
 
-  wss.on('connection', (ws) => {
+  wss.on('connection', (ws, request) => {
+    if (!hasApiAccess(request)) {
+      ws.close(1008, 'Authentication required');
+      return;
+    }
     console.log('[SIEM] WebSocket client connected');
 
     // Send current open alerts on connect
@@ -65,8 +146,9 @@ export function startServer(port: number = 3000) {
         const msg = JSON.parse(raw.toString());
 
         // Accept: { type: 'ingest', events: ChainEvent[] }
-        if (msg.type === 'ingest' && Array.isArray(msg.events)) {
+        if (msg.type === 'ingest' && validateEvents(msg.events)) {
           const result = await siemEngine.process(msg.events as ChainEvent[]);
+          await dispatchMatchingWebhooks(result.alerts);
           ws.send(JSON.stringify({ type: 'processed', data: {
             classified: result.classified.length,
             anomalies: result.scored.filter(e => e.anomaly.isAnomaly).length,
@@ -78,14 +160,14 @@ export function startServer(port: number = 3000) {
         }
 
         // Accept: { type: 'acknowledge', alertId: string }
-        if (msg.type === 'acknowledge' && msg.alertId) {
+        if (msg.type === 'acknowledge' && typeof msg.alertId === 'string' && msg.alertId.length <= 256) {
           const ok = siemEngine.acknowledgeAlert(msg.alertId);
           ws.send(JSON.stringify({ type: 'ack_result', alertId: msg.alertId, ok }));
           return;
         }
 
         // Accept: { type: 'resolve', alertId: string }
-        if (msg.type === 'resolve' && msg.alertId) {
+        if (msg.type === 'resolve' && typeof msg.alertId === 'string' && msg.alertId.length <= 256) {
           const ok = siemEngine.resolveAlert(msg.alertId);
           ws.send(JSON.stringify({ type: 'resolve_result', alertId: msg.alertId, ok }));
           return;
@@ -107,13 +189,56 @@ export function startServer(port: number = 3000) {
 
   app.use(cors());
   app.use(express.json({ limit: '2mb' }));
+  app.use('/api/siem', requireApiAccess);
+
+  app.post('/api/siem/clients', (req, res) => {
+    if (req.headers.authorization !== `Bearer ${process.env.AUDITX_API_TOKEN}`) {
+      res.status(403).json({ error: 'Admin authorization required.' });
+      return;
+    }
+    const { name, webhook_url: webhookUrl } = req.body as { name?: string; webhook_url?: string };
+    if (!name || !webhookUrl) {
+      res.status(400).json({ error: 'name and webhook_url are required' });
+      return;
+    }
+    let credentials: IssuedClientCredentials;
+    try {
+      credentials = tenantRegistry.registerClient(name, webhookUrl);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid client registration' });
+      return;
+    }
+    res.status(201).json({
+      client: credentials.client,
+      api_key: credentials.apiKey,
+      hmac_secret: credentials.hmacSecret,
+    });
+  });
+
+  app.post('/api/siem/monitored-addresses', (req, res) => {
+    const apiKey = typeof req.headers['x-api-key'] === 'string' ? req.headers['x-api-key'] : '';
+    const { address, chain, watch_config: watchConfig } = req.body as {
+      address?: string; chain?: string; watch_config?: string[];
+    };
+    if (!apiKey || !address || !chain || !watchConfig) {
+      res.status(400).json({ error: 'x-api-key, address, chain, and watch_config are required' });
+      return;
+    }
+    let monitored: MonitoredAddress;
+    try {
+      monitored = tenantRegistry.registerMonitoredAddress(apiKey, address, chain, watchConfig);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid monitored address' });
+      return;
+    }
+    res.status(201).json({ registration: monitored });
+  });
 
   // ─── SSE Stream Endpoint ────────────────────────────────────────────────
-  app.get('/stream', (req, res) => {
+  app.get('/stream', requireApiAccess, (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
-    res.setHeader('Access-Control-Allow-Origin', '*');
     res.flushHeaders();
 
     const heartbeat = setInterval(() => { res.write(': ping\n\n'); }, 15000);
@@ -152,7 +277,7 @@ export function startServer(port: number = 3000) {
 
     res.json({ ok: true, file: safeName, message: 'Audit started. Connect to /stream for live telemetry.' });
 
-    runPipeline(targetFile, { ai: false }).catch((err) => {
+    import('./pipeline.js').then(({ runPipeline }) => runPipeline(targetFile, { ai: false })).catch((err) => {
       console.log('[Pipeline Error]', err.message);
     });
   });
@@ -214,6 +339,7 @@ export function startServer(port: number = 3000) {
         }
 
         console.log(`[GitHub API] Starting audit pipeline on primary file: ${targetFiles[0]}`);
+        const { runPipeline } = await import('./pipeline.js');
         await runPipeline(targetFiles[0], { ai: false });
       } catch (err: any) {
         console.error('[GitHub API Audit Error]', err.message);
@@ -240,13 +366,14 @@ export function startServer(port: number = 3000) {
   /** POST /api/siem/ingest — ingest an array of ChainEvents */
   app.post('/api/siem/ingest', async (req, res) => {
     const events: ChainEvent[] = req.body?.events;
-    if (!Array.isArray(events) || events.length === 0) {
+    if (!validateEvents(events)) {
       res.status(400).json({ error: 'Expected { events: ChainEvent[] }' });
       return;
     }
 
     try {
       const result = await siemEngine.process(events);
+      await dispatchMatchingWebhooks(result.alerts);
       result.alerts.forEach(broadcastAlert);
       broadcastBaseline();
       res.json({
@@ -296,4 +423,5 @@ export function startServer(port: number = 3000) {
     console.log(`   POST /api/siem/ingest        — Ingest chain events`);
     console.log(`   WS   /ws/siem                — Real-time SIEM WebSocket`);
   });
+  return httpServer;
 }

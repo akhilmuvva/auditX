@@ -18,6 +18,7 @@ dotenv.config();
 // Configuration
 const RPC_URL = process.env.RPC_URL || 'http://127.0.0.1:8545'; // Defaults to local Hardhat node
 const SIEM_WS_URL = process.env.SIEM_WS_URL || 'ws://localhost:3000/ws/siem';
+const SIEM_API_KEY = process.env.SIEM_API_KEY;
 const RECONNECT_DELAY_MS = 5000;
 
 interface ChainEvent {
@@ -48,7 +49,7 @@ class SIEMAutomationStreamer {
 
     console.log(`🔌 Opening persistent connection to SIEM WebSocket: ${SIEM_WS_URL}`);
     
-    this.ws = new WebSocket(SIEM_WS_URL);
+    this.ws = new WebSocket(SIEM_WS_URL, SIEM_API_KEY ? [`auditx-api-key.${SIEM_API_KEY}`] : undefined);
 
     this.ws.on('open', () => {
       console.log('✅ Connected to SIEM WebSocket server. Real-time streaming active!');

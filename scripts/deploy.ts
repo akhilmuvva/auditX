@@ -21,11 +21,7 @@ async function main() {
 
   // 3. DisputeResolver
   const DisputeResolver = await ethers.getContractFactory("DisputeResolver");
-  // Temporary circular dependency workaround: AuditRegistry needs DisputeResolver, DisputeResolver needs AuditRegistry.
-  // We will deploy DisputeResolver with dummy AuditRegistry address, then set it later if possible, 
-  // or deploy AuditRegistry first.
-  
-  // Deploy AuditRegistry first (with dummy dispute resolver)
+  // Deploy AuditRegistry first, then link the resolver through its owner-only initializer.
   const AuditRegistry = await ethers.getContractFactory("AuditRegistry");
   const auditRegistry = await AuditRegistry.deploy(agentRegistryAddress, ethers.ZeroAddress);
   await auditRegistry.waitForDeployment();
@@ -38,7 +34,7 @@ async function main() {
   const disputeResolverAddress = await disputeResolver.getAddress();
   console.log("DisputeResolver deployed to:", disputeResolverAddress);
 
-  // Set DisputeResolver in AuditRegistry
+  // This setter is owner-controlled and single-use, preventing resolver front-running.
   await auditRegistry.setDisputeResolver(disputeResolverAddress);
   console.log("Linked DisputeResolver to AuditRegistry.");
 
