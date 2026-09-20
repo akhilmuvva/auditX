@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from 'crypto';
+import { createHmac, timingSafeEqual, randomBytes } from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { setTimeout as sleep } from 'timers/promises';
@@ -6,17 +6,21 @@ import type { Alert } from '../siem/types.js';
 import type { MonitoredAddress, ClientApp } from '../storage/tenantStore.js';
 
 export interface WebhookPayload {
+  schema_version: string;
   alert_id: string;
   contract_address: string;
-  owning_app: string;
+  owning_app?: string;
   chain: string;
-  severity: string;
+  severity: 'INFO' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | string;
   category: string;
   title: string;
   description: string;
-  timestamp: number;
+  detected_at: string;
+  timestamp?: number;
   event_type: string;
   tx_hash: string;
+  status?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface DLQItem {
@@ -37,31 +41,53 @@ export class WebhookDispatcher {
     this.loadDLQ();
   }
 
-  static signPayload(secret: string, payload: string): string {
-    return `sha256=${createHmac('sha256', secret).update(payload, 'utf8').digest('hex')}`;
+  /**
+   * Computes HMAC-SHA256 signature over `${timestamp}.${nonce}.${rawBody}`.
+   * Returns a 64-character lowercase hex string.
+   */
+  static signPayload(secret: string, rawBody: string, timestamp: string | number, nonce: string): string {
+    const messageToSign = `${timestamp}.${nonce}.${rawBody}`;
+    return createHmac('sha256', secret).update(messageToSign, 'utf8').digest('hex');
   }
 
-  static verifySignature(secret: string, payload: string, signatureHeader: string): boolean {
-    if (!signatureHeader || !secret) return false;
-    const computed = WebhookDispatcher.signPayload(secret, payload);
-    const left = Buffer.from(computed, 'utf8');
-    const right = Buffer.from(signatureHeader, 'utf8');
-    return left.length === right.length && timingSafeEqual(left, right);
+  /**
+   * Verifies an incoming HMAC-SHA256 signature in constant time.
+   */
+  static verifySignature(
+    secret: string,
+    rawBody: string,
+    signatureHeader: string,
+    timestamp: string | number,
+    nonce: string
+  ): boolean {
+    if (!signatureHeader || !secret || !timestamp || !nonce) return false;
+    const cleanSig = signatureHeader.startsWith('0x') ? signatureHeader.slice(2) : signatureHeader;
+    if (!/^[0-9a-fA-F]{64}$/.test(cleanSig)) return false;
+
+    const computed = WebhookDispatcher.signPayload(secret, rawBody, timestamp, nonce);
+    const left = Buffer.from(computed, 'hex');
+    const right = Buffer.from(cleanSig, 'hex');
+    return left.length === 32 && right.length === 32 && timingSafeEqual(left, right);
   }
 
   createPayload(monitored: MonitoredAddress, alert: Alert): WebhookPayload {
+    const detectedIso = new Date(alert.timestamp || Date.now()).toISOString();
     return {
+      schema_version: '1.0.0',
       alert_id: alert.id,
       contract_address: alert.event.contractAddress.toLowerCase(),
       owning_app: monitored.owningApp,
-      chain: monitored.chain,
+      chain: monitored.chain || '137',
       severity: alert.severity,
-      category: alert.event.category,
+      category: alert.event.category || 'SECURITY',
       title: alert.title,
       description: alert.description,
+      detected_at: detectedIso,
       timestamp: alert.timestamp,
       event_type: alert.event.eventName,
       tx_hash: alert.event.txHash,
+      status: 'DETECTED',
+      metadata: (alert.event as any).args ? { args: (alert.event as any).args } : undefined,
     };
   }
 
@@ -69,10 +95,13 @@ export class WebhookDispatcher {
     webhookUrl: string,
     secret: string,
     payload: WebhookPayload,
-    backoffDelaysMs: number[] = [0, 100, 200, 400] // Fast backoff for testing, configurable for production
+    backoffDelaysMs: number[] = [0, 100, 200, 400],
+    headersOverride?: { timestamp?: string; nonce?: string }
   ): Promise<boolean> {
     const rawBody = JSON.stringify(payload);
-    const signature = WebhookDispatcher.signPayload(secret, rawBody);
+    const timestamp = headersOverride?.timestamp ?? Date.now().toString();
+    const nonce = headersOverride?.nonce ?? randomBytes(16).toString('hex');
+    const signature = WebhookDispatcher.signPayload(secret, rawBody, timestamp, nonce);
     let lastError = 'Unknown error';
 
     for (let attempt = 0; attempt < backoffDelaysMs.length; attempt++) {
@@ -89,6 +118,8 @@ export class WebhookDispatcher {
           headers: {
             'content-type': 'application/json',
             'x-auditx-signature': signature,
+            'x-auditx-timestamp': timestamp,
+            'x-auditx-nonce': nonce,
           },
           body: rawBody,
           signal: controller.signal,
@@ -107,7 +138,7 @@ export class WebhookDispatcher {
 
     // Terminal failure: write to DLQ
     this.recordDLQ({
-      id: `dlq-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      id: `dlq-${Date.now()}-${randomBytes(4).toString('hex')}`,
       webhookUrl,
       payload,
       attempts: backoffDelaysMs.length,

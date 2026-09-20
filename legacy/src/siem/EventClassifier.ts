@@ -40,6 +40,95 @@ interface ClassifyRule {
 }
 
 const RULES: ClassifyRule[] = [
+  // ── Escrow Security Threat Detection Rules ─────────────────────────────
+  {
+    category: 'GOVERNANCE',
+    severity: 'CRITICAL',
+    match(e) {
+      const n = e.eventName.toLowerCase();
+      if (n === 'disputeresolved' || (n.includes('dispute') && n.includes('resolve'))) {
+        const bps = Number(e.args['freelancerBps'] ?? e.args['bps'] ?? 0);
+        const unauthorizedJudge = e.args['isArbitrator'] === false || e.args['unauthorizedJudge'] === true || e.args['unauthorized'] === true;
+        if (unauthorizedJudge || bps > 10000) {
+          return `Unauthorized dispute resolution or invalid split (${bps} bps) on JobEscrow`;
+        }
+      }
+      return null;
+    },
+  },
+  {
+    category: 'GOVERNANCE',
+    severity: 'CRITICAL',
+    match(e) {
+      const n = e.eventName.toLowerCase();
+      if (n === 'paymentreleased' || n === 'fund-release') {
+        const unfundedOrUnsubmitted = e.args['unfunded'] === true || e.args['unsubmitted'] === true || e.args['bypassed'] === true;
+        const toFreelancer = parseValueWei(e.args['toFreelancer'] as any);
+        const fee = parseValueWei(e.args['fee'] as any);
+        const fundedAmount = parseValueWei(e.args['fundedAmount'] as any);
+        const overflow = fundedAmount > 0n && (toFreelancer + fee > fundedAmount);
+
+        if (unfundedOrUnsubmitted || overflow) {
+          return `Unauthorized escrow fund release: PaymentReleased without required funding or submitted work validation`;
+        }
+      }
+      return null;
+    },
+  },
+  {
+    category: 'GOVERNANCE',
+    severity: 'HIGH',
+    match(e) {
+      const n = e.eventName.toLowerCase();
+      if (n === 'autoreleased' || n === 'auto-release') {
+        const premature = e.args['premature'] === true || e.args['reviewPeriodActive'] === true;
+        const elapsed = Number(e.args['elapsedSeconds'] ?? 999999);
+        const reviewPeriod = Number(e.args['reviewPeriod'] ?? 7 * 86400);
+        if (premature || elapsed < reviewPeriod) {
+          return `Premature auto-release: escrow claimed before mandatory review period elapsed`;
+        }
+      }
+      return null;
+    },
+  },
+  {
+    category: 'GOVERNANCE',
+    severity: 'HIGH',
+    match(e) {
+      const n = e.eventName.toLowerCase();
+      if (n === 'feecollected' || n === 'paymentreleased' || n === 'fund-release') {
+        const feeBps = Number(e.args['feeBps'] ?? 0);
+        const feeAnomaly = e.args['feeAnomaly'] === true || feeBps > 250;
+        if (feeAnomaly) {
+          return `Platform fee rate anomaly: fee (${feeBps} bps) exceeds 2.5% (250 bps) platform limit`;
+        }
+      }
+      return null;
+    },
+  },
+  {
+    category: 'LARGE_WITHDRAWAL',
+    severity: 'CRITICAL',
+    match(e) {
+      const n = e.eventName.toLowerCase();
+      if (n === 'transfer' && (e.args['unmatchedEscrowDrain'] === true || e.args['isEscrowDrain'] === true)) {
+        return `Escrow drain detected: direct token/native asset transfer without matching release or cancellation event`;
+      }
+      return null;
+    },
+  },
+  {
+    category: 'OWNERSHIP_CHANGE',
+    severity: 'CRITICAL',
+    match(e) {
+      const n = e.eventName.toLowerCase();
+      if ((n === 'rolegranted' || n === 'rolerevoked') && (e.args['unauthorized'] === true || e.args['senderIsNotAdmin'] === true)) {
+        return `Unauthorized factory role change: ${e.eventName} on JobFactory without administrative authorization`;
+      }
+      return null;
+    },
+  },
+
   // ── Governance Speedrun Heuristic ───────────────────────────────────────
   {
     category: 'GOVERNANCE',

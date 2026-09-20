@@ -3,11 +3,20 @@ name = "auditx-identity-http"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "auditx_identity_http"
+path = "src/lib.rs"
+
+[[bin]]
+name = "auditx-identity-http"
+path = "src/main.rs"
+
 [dependencies]
 auditx-identity = { path = "../auditx-identity" }
 auditx-core = { path = "../auditx-core" }
 axum = { workspace = true }
 tower-http = { workspace = true }
+tower = { version = "0.5", features = ["util"] }
 tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

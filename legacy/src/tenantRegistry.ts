@@ -124,7 +124,7 @@ export class TenantRegistry extends EventEmitter {
       !Array.isArray(watchConfig) ||
       watchConfig.length === 0 ||
       watchConfig.length > MAX_WATCH_CONFIG ||
-      watchConfig.some((eventType) => typeof eventType !== 'string' || !/^[a-z0-9-]{1,64}$/.test(eventType))
+      watchConfig.some((eventType) => typeof eventType !== 'string' || !/^[a-zA-Z0-9_-]{1,64}$/.test(eventType))
     ) {
       throw new Error('Invalid watch configuration');
     }
@@ -213,6 +213,7 @@ export class TenantRegistry extends EventEmitter {
     if (!client) throw new Error(`No client credentials found for ${monitored.owningApp}`);
 
     const payload = JSON.stringify({
+      schema_version: '1.0.0',
       alert_id: alert.id,
       contract_address: alert.event.contractAddress.toLowerCase(),
       owning_app: monitored.owningApp,
@@ -221,11 +222,16 @@ export class TenantRegistry extends EventEmitter {
       category: alert.event.category,
       title: alert.title,
       description: alert.description,
+      detected_at: new Date(alert.timestamp || Date.now()).toISOString(),
       timestamp: alert.timestamp,
       event_type: alert.event.eventName,
       tx_hash: alert.event.txHash,
+      status: 'DETECTED',
     });
-    const signature = TenantRegistry.signPayload(client.hmacSecret, payload);
+    const timestamp = Date.now().toString();
+    const nonce = randomBytes(16).toString('hex');
+    const messageToSign = `${timestamp}.${nonce}.${payload}`;
+    const signature = createHmac('sha256', client.hmacSecret).update(messageToSign, 'utf8').digest('hex');
     let lastError = 'Webhook request failed';
 
     for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -237,6 +243,8 @@ export class TenantRegistry extends EventEmitter {
           headers: {
             'content-type': 'application/json',
             'x-auditx-signature': signature,
+            'x-auditx-timestamp': timestamp,
+            'x-auditx-nonce': nonce,
           },
           body: payload,
           signal: controller.signal,

@@ -22,6 +22,15 @@ export interface MonitoredAddress {
   registeredAt: string;
 }
 
+export interface DLQItem {
+  id: string;
+  webhookUrl: string;
+  payload: any;
+  attempts: number;
+  lastError: string;
+  failedAt: string;
+}
+
 export interface ITenantStore {
   init(): Promise<void>;
   saveClient(client: ClientApp): Promise<void>;
@@ -32,16 +41,27 @@ export interface ITenantStore {
   listAllMonitoredAddresses(): Promise<MonitoredAddress[]>;
   deleteMonitoredAddress(apiKeyHash: string, idOrAddress: string): Promise<boolean>;
   lookupAddress(address: string): Promise<MonitoredAddress[]>;
+
+  // DLQ persistence
+  saveDLQItem(item: DLQItem): Promise<void>;
+  listDLQItems(): Promise<DLQItem[]>;
+  clearDLQ(): Promise<void>;
+
+  // Synchronous helpers
   listClientsSync?(): ClientApp[];
   listAllMonitoredAddressesSync?(): MonitoredAddress[];
   saveClientSync?(client: ClientApp): void;
   saveMonitoredAddressSync?(monitored: MonitoredAddress): void;
   deleteMonitoredAddressSync?(apiKeyHash: string, idOrAddress: string): boolean;
+  saveDLQItemSync?(item: DLQItem): void;
+  listDLQItemsSync?(): DLQItem[];
+  clearDLQSync?(): void;
 }
 
 export class MemoryTenantStore implements ITenantStore {
   private clients: Map<string, ClientApp> = new Map();
   private monitored: Map<string, MonitoredAddress> = new Map();
+  private dlq: DLQItem[] = [];
 
   async init(): Promise<void> {}
 
@@ -142,6 +162,30 @@ export class MemoryTenantStore implements ITenantStore {
   async lookupAddress(address: string): Promise<MonitoredAddress[]> {
     return this.lookupAddressSync(address);
   }
+
+  saveDLQItemSync(item: DLQItem): void {
+    this.dlq.push({ ...item });
+  }
+
+  async saveDLQItem(item: DLQItem): Promise<void> {
+    this.saveDLQItemSync(item);
+  }
+
+  listDLQItemsSync(): DLQItem[] {
+    return [...this.dlq];
+  }
+
+  async listDLQItems(): Promise<DLQItem[]> {
+    return this.listDLQItemsSync();
+  }
+
+  clearDLQSync(): void {
+    this.dlq = [];
+  }
+
+  async clearDLQ(): Promise<void> {
+    this.clearDLQSync();
+  }
 }
 
 export class FileTenantStore implements ITenantStore {
@@ -167,6 +211,11 @@ export class FileTenantStore implements ITenantStore {
           this.memory.saveMonitoredAddressSync(mon);
         }
       }
+      if (Array.isArray(data.dlq)) {
+        for (const item of data.dlq) {
+          this.memory.saveDLQItemSync(item);
+        }
+      }
     } catch {
       // ignore parse error on fresh start
     }
@@ -179,9 +228,10 @@ export class FileTenantStore implements ITenantStore {
   private persistSync(): void {
     const clients = this.memory.listClientsSync();
     const monitored = this.memory.listAllMonitoredAddressesSync();
+    const dlq = this.memory.listDLQItemsSync();
     const tempPath = `${this.filePath}.${process.pid}.tmp`;
     fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
-    fs.writeFileSync(tempPath, JSON.stringify({ clients, monitored }, null, 2), {
+    fs.writeFileSync(tempPath, JSON.stringify({ clients, monitored, dlq }, null, 2), {
       encoding: 'utf8',
       mode: 0o600,
     });
@@ -250,6 +300,32 @@ export class FileTenantStore implements ITenantStore {
 
   async lookupAddress(address: string): Promise<MonitoredAddress[]> {
     return this.lookupAddressSync(address);
+  }
+
+  saveDLQItemSync(item: DLQItem): void {
+    this.memory.saveDLQItemSync(item);
+    this.persistSync();
+  }
+
+  async saveDLQItem(item: DLQItem): Promise<void> {
+    this.saveDLQItemSync(item);
+  }
+
+  listDLQItemsSync(): DLQItem[] {
+    return this.memory.listDLQItemsSync();
+  }
+
+  async listDLQItems(): Promise<DLQItem[]> {
+    return this.listDLQItemsSync();
+  }
+
+  clearDLQSync(): void {
+    this.memory.clearDLQSync();
+    this.persistSync();
+  }
+
+  async clearDLQ(): Promise<void> {
+    this.clearDLQSync();
   }
 }
 
@@ -325,6 +401,30 @@ export class SqliteTenantStore implements ITenantStore {
   lookupAddressSync(address: string): MonitoredAddress[] {
     return this.fallback.lookupAddressSync(address);
   }
+
+  async saveDLQItem(item: DLQItem): Promise<void> {
+    await this.fallback.saveDLQItem(item);
+  }
+
+  saveDLQItemSync(item: DLQItem): void {
+    this.fallback.saveDLQItemSync(item);
+  }
+
+  async listDLQItems(): Promise<DLQItem[]> {
+    return this.fallback.listDLQItems();
+  }
+
+  listDLQItemsSync(): DLQItem[] {
+    return this.fallback.listDLQItemsSync();
+  }
+
+  async clearDLQ(): Promise<void> {
+    await this.fallback.clearDLQ();
+  }
+
+  clearDLQSync(): void {
+    this.fallback.clearDLQSync();
+  }
 }
 
 export class PostgresTenantStore implements ITenantStore {
@@ -398,5 +498,29 @@ export class PostgresTenantStore implements ITenantStore {
 
   lookupAddressSync(address: string): MonitoredAddress[] {
     return this.fallback.lookupAddressSync(address);
+  }
+
+  async saveDLQItem(item: DLQItem): Promise<void> {
+    await this.fallback.saveDLQItem(item);
+  }
+
+  saveDLQItemSync(item: DLQItem): void {
+    this.fallback.saveDLQItemSync(item);
+  }
+
+  async listDLQItems(): Promise<DLQItem[]> {
+    return this.fallback.listDLQItems();
+  }
+
+  listDLQItemsSync(): DLQItem[] {
+    return this.fallback.listDLQItemsSync();
+  }
+
+  async clearDLQ(): Promise<void> {
+    await this.fallback.clearDLQ();
+  }
+
+  clearDLQSync(): void {
+    this.fallback.clearDLQSync();
   }
 }

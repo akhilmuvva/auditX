@@ -132,11 +132,23 @@ export function startServer(port: number = 3000, registry?: TenantRegistry) {
     }
   });
 
-  /** Broadcast an alert to all connected SIEM dashboard clients */
+  /** Broadcast an alert to connected SIEM dashboard clients (filtered by tenant) */
   function broadcastAlert(alert: Alert) {
     const payload = JSON.stringify({ type: 'alert', data: alert });
+    const targetAddr = alert.event.contractAddress.toLowerCase();
+
     for (const client of wss.clients) {
       if (client.readyState === WebSocket.OPEN) {
+        const clientApiKey = (client as any).apiKey;
+        if (clientApiKey) {
+          try {
+            const monitored = tenantRegistry.listMonitoredAddresses(clientApiKey);
+            const isMonitored = monitored.some(m => m.address.toLowerCase() === targetAddr);
+            if (!isMonitored) continue;
+          } catch {
+            continue;
+          }
+        }
         client.send(payload);
       }
     }
@@ -164,8 +176,25 @@ export function startServer(port: number = 3000, registry?: TenantRegistry) {
     }
     console.log('[SIEM] WebSocket client connected');
 
-    // Send current open alerts on connect
-    const openAlerts = siemEngine.getOpenAlerts();
+    const websocketProtocol = typeof request.headers['sec-websocket-protocol'] === 'string'
+      ? request.headers['sec-websocket-protocol'].split(',').map((value) => value.trim())
+        .find((value) => value.startsWith('auditx-api-key.'))?.slice('auditx-api-key.'.length)
+      : undefined;
+    const apiKey = (typeof request.headers['x-api-key'] === 'string' ? request.headers['x-api-key'] : undefined)
+      || websocketProtocol;
+    (ws as any).apiKey = apiKey;
+
+    // Send current open alerts on connect (filtered by tenant)
+    let openAlerts = siemEngine.getOpenAlerts();
+    if (apiKey) {
+      try {
+        const monitored = tenantRegistry.listMonitoredAddresses(apiKey);
+        const allowed = new Set(monitored.map(m => m.address.toLowerCase()));
+        openAlerts = openAlerts.filter(a => allowed.has(a.event.contractAddress.toLowerCase()));
+      } catch {
+        openAlerts = [];
+      }
+    }
     ws.send(JSON.stringify({ type: 'init', data: { openAlerts, baseline: siemEngine.getBaseline() } }));
 
     ws.on('message', async (raw) => {
@@ -493,12 +522,25 @@ export function startServer(port: number = 3000, registry?: TenantRegistry) {
 
   // ─── SIEM REST Endpoints ─────────────────────────────────────────────────
 
-  /** GET /api/siem/alerts — returns open alerts */
-  app.get('/api/siem/alerts', (_req, res) => {
+  /** GET /api/siem/alerts — returns open alerts (filtered by tenant if x-api-key is provided) */
+  app.get('/api/siem/alerts', (req, res) => {
+    const apiKey = typeof req.headers['x-api-key'] === 'string' ? req.headers['x-api-key'] : '';
+    let openAlerts = siemEngine.getOpenAlerts();
+
+    if (apiKey) {
+      try {
+        const clientMonitored = tenantRegistry.listMonitoredAddresses(apiKey);
+        const allowedAddresses = new Set(clientMonitored.map(m => m.address.toLowerCase()));
+        openAlerts = openAlerts.filter(a => allowedAddresses.has(a.event.contractAddress.toLowerCase()));
+      } catch {
+        openAlerts = [];
+      }
+    }
+
     res.json({
       ok: true,
-      alerts: siemEngine.getOpenAlerts(),
-      total: siemEngine.alertManager.totalCount,
+      alerts: openAlerts,
+      total: openAlerts.length,
     });
   });
 

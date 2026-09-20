@@ -51,7 +51,9 @@ describe('Phase 8: High-Scale PolyLance E2E Benchmark & Fault Injection', () => 
         }
 
         const sig = req.headers['x-auditx-signature'] as string;
-        const valid = WebhookDispatcher.verifySignature(issuedHmacSecret, body, sig);
+        const ts = req.headers['x-auditx-timestamp'] as string;
+        const nonce = req.headers['x-auditx-nonce'] as string;
+        const valid = WebhookDispatcher.verifySignature(issuedHmacSecret, body, sig, ts, nonce);
         if (!valid) {
           res.writeHead(401).end('Invalid signature');
           return;
@@ -147,6 +149,7 @@ describe('Phase 8: High-Scale PolyLance E2E Benchmark & Fault Injection', () => 
     // 7. Fault Injection Test: Receiver Failure -> DLQ Persistence -> Recovery
     simulate500 = true;
     const faultPayload = {
+      schema_version: '1.0.0',
       alert_id: 'fault-alert-999',
       contract_address: targetAddress.toLowerCase(),
       owning_app: 'PolyLance',
@@ -155,9 +158,11 @@ describe('Phase 8: High-Scale PolyLance E2E Benchmark & Fault Injection', () => 
       category: 'GOVERNANCE',
       title: 'Fault Injected Alert',
       description: 'Testing DLQ overflow handling',
+      detected_at: new Date().toISOString(),
       timestamp: Date.now(),
       event_type: 'fund-release',
       tx_hash: '0xfault',
+      status: 'DETECTED',
     };
 
     const failedSend = await dispatcher.sendWithRetry(

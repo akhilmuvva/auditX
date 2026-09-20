@@ -57,12 +57,17 @@ function alertFor(address: string): Alert {
 
 describe('TenantRegistry', () => {
   it('persists tenant isolation and delivers a signed alert webhook', async () => {
-    const received: { body: string; signature?: string }[] = [];
+    const received: { body: string; signature?: string; timestamp?: string; nonce?: string }[] = [];
     const webhook = createServer((request, response) => {
       let body = '';
       request.on('data', (chunk) => { body += chunk; });
       request.on('end', () => {
-        received.push({ body, signature: request.headers['x-auditx-signature'] });
+        received.push({
+          body,
+          signature: request.headers['x-auditx-signature'] as string,
+          timestamp: request.headers['x-auditx-timestamp'] as string,
+          nonce: request.headers['x-auditx-nonce'] as string,
+        });
         response.writeHead(202).end();
       });
     }).listen(0);
@@ -82,9 +87,9 @@ describe('TenantRegistry', () => {
 
     await registry.dispatchAlert(monitored, alertFor(monitored.address));
     expect(received).toHaveLength(1);
-    expect(received[0].signature).toBe(
-      TenantRegistry.signPayload(issued.hmacSecret, received[0].body),
-    );
+    const msgToSign = `${received[0].timestamp}.${received[0].nonce}.${received[0].body}`;
+    const expectedSig = require('crypto').createHmac('sha256', issued.hmacSecret).update(msgToSign).digest('hex');
+    expect(received[0].signature).toBe(expectedSig);
     expect(new TenantRegistry(filePath).authenticate(issued.apiKey)?.name).toBe('PolyLance');
     expect(new TenantRegistry(filePath).authenticate('ax_live_invalid')).toBeUndefined();
   });
