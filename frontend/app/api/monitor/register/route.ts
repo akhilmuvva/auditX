@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-static';
 
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
+
 // Multi-tenant registration in-memory store for Web API
 const REGISTRATION_DB: Map<string, {
   id: string;
@@ -12,6 +16,21 @@ const REGISTRATION_DB: Map<string, {
   watch_config: string[];
   registered_at: string;
 }> = new Map();
+
+function findTenantByApiKey(apiKey: string): { name: string; webhookUrl: string } | null {
+  try {
+    const registryPath = path.join(process.cwd(), 'auditx-tenant-registry.json');
+    if (fs.existsSync(registryPath)) {
+      const data = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+      const hash = crypto.createHash('sha256').update(apiKey, 'utf8').digest('hex');
+      const client = data.clients?.find((c: any) => c.apiKeyHash === hash);
+      if (client) {
+        return { name: client.name, webhookUrl: client.webhookUrl };
+      }
+    }
+  } catch {}
+  return null;
+}
 
 export async function POST(request: Request) {
   try {
@@ -25,14 +44,15 @@ export async function POST(request: Request) {
       );
     }
 
+    const tenant = findTenantByApiKey(api_key);
     const normAddr = address.toLowerCase();
-    const owningApp = api_key.includes('polylance') ? 'polylance' : 'client-app';
-    const webhookUrl = body.webhook_url || `https://${owningApp}.app/api/webhooks/auditx-alert`;
+    const owningApp = tenant?.name || (api_key.includes('polylance') ? 'PolyLance' : 'client-app');
+    const webhookUrl = tenant?.webhookUrl || body.webhook_url || `https://${owningApp.toLowerCase()}.app/api/webhooks/auditx-alert`;
 
     const record = {
       id: `mon-${Math.random().toString(36).substring(2, 11)}`,
       address: normAddr,
-      chain: chain || 'polygon-amoy',
+      chain: chain || 'polygon-mainnet',
       owning_app: owningApp,
       webhook_url: webhookUrl,
       watch_config: watch_config || ['reentrancy', 'flashloan', 'threat-address'],
