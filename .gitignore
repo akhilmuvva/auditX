@@ -22,3 +22,12 @@ dist/
 # Env files
 .env
 .env.local
+.env.production
+
+# Tenant registries & persistence
+auditx-tenant-registry*.json
+*.db
+*.sqlite
+*.sqlite3
+*.tmp
+

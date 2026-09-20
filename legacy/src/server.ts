@@ -256,6 +256,72 @@ export function startServer(port: number = 3000, registry?: TenantRegistry) {
     res.status(201).json({ registration: monitored });
   });
 
+  app.get('/api/siem/monitored-addresses', (req, res) => {
+    const apiKey = typeof req.headers['x-api-key'] === 'string' ? req.headers['x-api-key'] : '';
+    const authorization = req.headers.authorization;
+    if (authorization === `Bearer ${process.env.AUDITX_API_TOKEN}`) {
+      res.json({ total: tenantRegistry.listAllMonitoredAddresses().length, registrations: tenantRegistry.listAllMonitoredAddresses() });
+      return;
+    }
+    if (!apiKey) {
+      res.status(400).json({ error: 'x-api-key is required' });
+      return;
+    }
+    try {
+      const list = tenantRegistry.listMonitoredAddresses(apiKey);
+      res.json({ total: list.length, registrations: list });
+    } catch (error) {
+      res.status(401).json({ error: error instanceof Error ? error.message : 'Invalid API key' });
+    }
+  });
+
+  app.delete('/api/siem/monitored-addresses/:idOrAddress', (req, res) => {
+    const apiKey = typeof req.headers['x-api-key'] === 'string' ? req.headers['x-api-key'] : '';
+    if (!apiKey) {
+      res.status(400).json({ error: 'x-api-key is required' });
+      return;
+    }
+    const target = req.params.idOrAddress;
+    try {
+      const removed = tenantRegistry.deregisterMonitoredAddress(apiKey, target);
+      if (!removed) {
+        res.status(404).json({ error: `Monitored address or ID ${target} not found for this client.` });
+        return;
+      }
+      res.json({ ok: true, message: `Deregistered ${target}` });
+    } catch (error) {
+      res.status(401).json({ error: error instanceof Error ? error.message : 'Invalid API key' });
+    }
+  });
+
+  // Alias for backward compatibility with PolyLance client registration
+  app.post('/api/monitor/register', requireApiAccess, (req, res) => {
+    const apiKey = (typeof req.headers['x-api-key'] === 'string' ? req.headers['x-api-key'] : '')
+      || (typeof req.body?.api_key === 'string' ? req.body.api_key : '');
+    const { address, chain, watch_config: watchConfig } = req.body as {
+      address?: string; chain?: string; watch_config?: string[];
+    };
+    if (!apiKey || !address) {
+      res.status(400).json({ error: 'api_key and address are required' });
+      return;
+    }
+    try {
+      const monitored = tenantRegistry.registerMonitoredAddress(
+        apiKey,
+        address,
+        chain || 'polygon',
+        watchConfig || ['fund-release', 'dispute-trigger'],
+      );
+      res.status(201).json({
+        status: 'SUCCESS',
+        message: 'Address registered successfully for real-time SIEM monitoring',
+        registration: monitored,
+      });
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : 'Failed to register monitored address' });
+    }
+  });
+
   // ─── SSE Stream Endpoint ────────────────────────────────────────────────
   app.get('/stream', requireApiAccess, (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream');

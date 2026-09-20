@@ -113,6 +113,29 @@ export class TenantRegistry {
     return monitored;
   }
 
+  listMonitoredAddresses(apiKey: string): MonitoredAddress[] {
+    const client = this.authenticate(apiKey);
+    if (!client) throw new Error('Invalid API key');
+    return this.state.monitored.filter((m) => m.apiKeyHash === client.apiKeyHash);
+  }
+
+  listAllMonitoredAddresses(): MonitoredAddress[] {
+    return [...this.state.monitored];
+  }
+
+  deregisterMonitoredAddress(apiKey: string, idOrAddress: string): boolean {
+    const client = this.authenticate(apiKey);
+    if (!client) throw new Error('Invalid API key');
+    const target = idOrAddress.toLowerCase();
+    const index = this.state.monitored.findIndex(
+      (m) => m.apiKeyHash === client.apiKeyHash && (m.id === idOrAddress || m.address === target),
+    );
+    if (index === -1) return false;
+    this.state.monitored.splice(index, 1);
+    this.persist();
+    return true;
+  }
+
   lookupAddress(address: string): MonitoredAddress[] {
     return this.state.monitored.filter((monitored) => monitored.address === address.toLowerCase());
   }
@@ -182,9 +205,37 @@ export class TenantRegistry {
 
   private validateWebhookUrl(webhookUrl: string): void {
     const parsed = new URL(webhookUrl);
-    if (parsed.protocol !== 'https:' && parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1') {
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
       throw new Error('Webhook URL must use HTTPS');
     }
+    const isLocalhost = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1' || parsed.hostname === '::1';
+    if (process.env.NODE_ENV === 'production') {
+      if (parsed.protocol !== 'https:') {
+        throw new Error('Webhook URL must use HTTPS in production');
+      }
+      if (isLocalhost || this.isPrivateIp(parsed.hostname)) {
+        throw new Error('Webhook URL cannot target private or loopback addresses in production');
+      }
+    } else {
+      if (parsed.protocol !== 'https:' && !isLocalhost) {
+        throw new Error('Webhook URL must use HTTPS unless targeting localhost for testing');
+      }
+    }
+  }
+
+  private isPrivateIp(host: string): boolean {
+    const ipv4Match = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+    if (ipv4Match) {
+      const b0 = parseInt(ipv4Match[1], 10);
+      const b1 = parseInt(ipv4Match[2], 10);
+      if (b0 === 10) return true;
+      if (b0 === 127) return true;
+      if (b0 === 172 && b1 >= 16 && b1 <= 31) return true;
+      if (b0 === 192 && b1 === 168) return true;
+      if (b0 === 169 && b1 === 254) return true;
+      if (b0 === 0) return true;
+    }
+    return host === 'localhost' || host.endsWith('.local') || host.endsWith('.internal');
   }
 }
 
