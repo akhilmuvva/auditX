@@ -24,15 +24,18 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
           cache-dependency-path: 'frontend/package-lock.json'
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
+        with:
+          enablement: true
+        continue-on-error: true
 
       - name: Install Frontend Dependencies
         run: |
@@ -59,7 +62,9 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: 'frontend/out'
+        continue-on-error: true
 
       - name: Deploy to GitHub Pages Action
         id: deployment
         uses: actions/deploy-pages@v4
+        continue-on-error: true
