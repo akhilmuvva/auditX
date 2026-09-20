@@ -1,26 +1,113 @@
+@import url('https://api.fontshare.com/v2/css?f[]=general-sans@200,300,400,500,600,700,800&f[]=satoshi@300,400,500,700,900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;700&display=swap');
 @import "tailwindcss";
 
+@theme {
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-heading: 'General Sans', system-ui, sans-serif;
+  --font-satoshi: 'Satoshi', sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+  --font-space: 'Space Grotesk', sans-serif;
+  --font-jetbrains: 'JetBrains Mono', monospace;
+}
+
+/* ==========================================================================
+   POLYLANCE / AUDITX PREMIUM LIGHT COLOR SYSTEM & VISUAL ARCHITECTURE
+   ========================================================================== */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Core Light Palette */
+  --bg-primary: #F6F9FC;
+  --bg-secondary: #EEF4F8;
+  --bg-card: #FFFFFF;
+  --bg-card-hover: #FFFFFF;
+  --bg-glass-input: #FFFFFF;
+
+  /* Primary Brand Colors */
+  --primary: #2563EB;
+  --primary-container: #1D4ED8;
+  --primary-glow: rgba(37, 99, 235, 0.15);
+
+  /* Brand Accents */
+  --accent-cyan: #06CFE8;
+  --accent-lime: #A8E63A;
+  --accent-indigo: #4F46E5;
+  --accent-purple: #7C3AED;
+  --accent-emerald: #16A34A;
+  --accent-amber: #F59E0B;
+  --accent-rose: #EF4444;
+
+  /* Typography Text Colors */
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  --text-muted: #94A3B8;
+
+  /* Borders & Dividers */
+  --border-subtle: #E2E8F0;
+  --border-hover: #BFDBFE;
+  --border-active: #2563EB;
+  --border-glow: rgba(37, 99, 235, 0.25);
+  --border-cyan: rgba(6, 207, 232, 0.4);
+  --border-emerald: rgba(22, 163, 74, 0.4);
+
+  /* Elevation Shadows */
+  --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 8px 30px rgba(15, 23, 42, 0.06);
+  --shadow-lg: 0 16px 40px rgba(15, 23, 42, 0.08);
+  --shadow-btn: 0 6px 18px rgba(37, 99, 235, 0.20);
+  --shadow-btn-hover: 0 8px 24px rgba(37, 99, 235, 0.32);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+* {
+  box-sizing: border-box;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  overflow-x: hidden;
+  line-height: 1.5;
+  position: relative;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  background-image:
+    radial-gradient(circle at 85% 15%, rgba(6, 207, 232, 0.07) 0%, transparent 45%),
+    radial-gradient(circle at 15% 85%, rgba(37, 99, 235, 0.05) 0%, transparent 45%),
+    radial-gradient(circle at 50% 50%, rgba(124, 58, 237, 0.03) 0%, transparent 60%);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  letter-spacing: -0.02em;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #F1F5F9;
+}
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
 }

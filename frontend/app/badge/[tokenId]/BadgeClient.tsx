@@ -3,7 +3,7 @@
 import React, { useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ShieldCheck, Award } from 'lucide-react';
+import { ShieldCheck, Award, ArrowLeft, CheckCircle2 } from 'lucide-react';
 
 export default function BadgeClient() {
   const params = useParams();
@@ -13,57 +13,56 @@ export default function BadgeClient() {
   }, [params]);
 
   if (tokenId === null || !Number.isSafeInteger(tokenId)) {
-    return <div className="min-h-screen bg-[#030303] text-white flex items-center justify-center">Invalid badge token ID.</div>;
+    return <div className="min-h-screen bg-[#F6F9FC] text-slate-700 flex items-center justify-center font-medium">Invalid badge token ID.</div>;
   }
 
   return (
-    <div className="min-h-screen bg-[#030303] text-white flex flex-col items-center justify-center p-6 font-sans">
+    <div className="min-h-screen bg-[#F6F9FC] text-slate-900 flex flex-col items-center justify-center p-6 font-sans selection:bg-blue-600 selection:text-white">
       <div className="max-w-md w-full flex flex-col gap-6">
         <div className="text-center flex flex-col gap-2">
-          <Award className="w-10 h-10 text-emerald-400 mx-auto" />
-          <h1 className="text-2xl font-black">Security Badge Verification</h1>
-          <p className="text-xs text-white/40">Verified Token ID: #{tokenId}</p>
+          <Link href="/dashboard" className="text-xs text-slate-500 hover:text-blue-600 inline-flex items-center justify-center gap-1 mb-2">
+            <ArrowLeft className="w-3.5 h-3.5" /> Back to Dashboard
+          </Link>
+          <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 mx-auto shadow-sm">
+            <Award className="w-6 h-6" />
+          </div>
+          <h1 className="text-2xl font-black text-slate-900">Soulbound Security Badge</h1>
+          <p className="text-xs text-slate-500">Verified Token ID: #{tokenId}</p>
         </div>
 
-        <div className="w-full aspect-[4/5] rounded-3xl overflow-hidden border border-white/[0.08] shadow-[0_0_50px_rgba(16,185,129,0.1)] bg-[#050508]">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 500" width="100%" height="100%" style={{ background: '#050508', fontFamily: 'sans-serif' }}>
-        <defs>
-          <linearGradient id="glow" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#10B981" stopOpacity="0.4"/>
-            <stop offset="100%" stopColor="#0a0b10" stopOpacity="0"/>
-          </linearGradient>
-        </defs>
-        <rect width="400" height="500" rx="30" fill="#0a0b10" stroke="rgba(255,255,255,0.08)" strokeWidth="1.5"/>
-        <circle cx="200" cy="200" r="140" fill="url(#glow)" />
-        <polygon points="200,80 320,140 320,300 200,420 80,300 80,140" fill="none" stroke="#10B981" strokeWidth="2" />
-        <path d="M170 180l20 20 40-40" fill="none" stroke="#10B981" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"/>
-        <text x="200" y="270" fill="#ffffff" fontSize="22" fontWeight="800" textAnchor="middle">EMERALD GUARD</text>
-        <text x="200" y="305" fill="rgba(255,255,255,0.6)" fontSize="11" fontWeight="700" textAnchor="middle">SECURITY CERTIFIED</text>
-        <text x="200" y="350" fill="#818cf8" fontSize="10" textAnchor="middle">TOKEN ID: #{tokenId}</text>
-      </svg>
+        <div className="w-full aspect-[4/5] rounded-3xl overflow-hidden border border-slate-200 shadow-md bg-white p-4">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 500" width="100%" height="100%" style={{ background: '#ffffff', fontFamily: 'sans-serif' }}>
+            <defs>
+              <linearGradient id="badgeGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#10B981" stopOpacity="0.15"/>
+                <stop offset="100%" stopColor="#ffffff" stopOpacity="0"/>
+              </linearGradient>
+            </defs>
+            <rect width="400" height="500" rx="30" fill="#ffffff" stroke="#E2E8F0" strokeWidth="2"/>
+            <circle cx="200" cy="200" r="140" fill="url(#badgeGlow)" />
+            <polygon points="200,80 320,140 320,300 200,420 80,300 80,140" fill="#F0FDF4" stroke="#16A34A" strokeWidth="3" />
+            <path d="M170 180l20 20 40-40" fill="none" stroke="#16A34A" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"/>
+            <text x="200" y="270" fill="#0F172A" fontSize="22" fontWeight="800" textAnchor="middle">EMERALD GUARD</text>
+            <text x="200" y="305" fill="#16A34A" fontSize="12" fontWeight="700" textAnchor="middle">SECURITY CERTIFIED</text>
+            <text x="200" y="350" fill="#2563EB" fontSize="11" fontWeight="600" textAnchor="middle">TOKEN ID: #{tokenId}</text>
+          </svg>
         </div>
 
-        <div className="p-4 rounded-xl bg-white/[0.01] border border-white/[0.06] text-xs flex flex-col gap-3">
-          <div className="flex justify-between">
-            <span className="text-white/40">Contract Compliance</span>
-            <span className="text-emerald-400 font-bold flex items-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5" /> PASSED
+        <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm text-xs flex flex-col gap-3">
+          <div className="flex justify-between items-center">
+            <span className="text-slate-500">Contract Compliance</span>
+            <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
+              <CheckCircle2 className="w-3.5 h-3.5" /> PASSED
             </span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-white/40">On-Chain Registrar</span>
-            <span className="text-indigo-400 font-bold font-mono">Polygon PoS</span>
+          <div className="flex justify-between items-center">
+            <span className="text-slate-500">On-Chain Registrar</span>
+            <span className="text-blue-700 font-bold font-mono">Polygon PoS</span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-white/40">Audit Agency</span>
-            <span className="text-white/80 font-bold">AuditX Master Agent</span>
+          <div className="flex justify-between items-center">
+            <span className="text-slate-500">Audit Agency</span>
+            <span className="text-slate-900 font-bold">AuditX Master Agent</span>
           </div>
-        </div>
-
-        <div className="flex gap-4">
-          <Link href="/audit" className="flex-1 bg-white hover:bg-white/90 text-black font-bold h-11 flex items-center justify-center rounded-xl text-xs transition-all">
-            Scan My Code
-          </Link>
         </div>
       </div>
     </div>

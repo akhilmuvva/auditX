@@ -5,14 +5,14 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { 
   ShieldAlert, ShieldCheck, Layers, Link as LinkIcon, 
-  ExternalLink, Code, AlertTriangle, Cpu, HelpCircle, CheckCircle2 
+  ExternalLink, Code, AlertTriangle, Cpu, HelpCircle, CheckCircle2, ArrowLeft, Terminal 
 } from 'lucide-react';
 
 export default function ReportClient() {
   const params = useParams();
   const reportId = (params?.id as string) || 'clean';
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'web3' | 'web2' | 'chains' | 'surya' | 'forta' | 'pipeline' | 'trust'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'web3' | 'web2' | 'chains' | 'trust'>('overview');
   const [report, setReport] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -33,33 +33,31 @@ export default function ReportClient() {
             web3_findings: [
               {
                 id: 'web3-custom-gas-opt-1',
-                tool: 'custom',
+                tool: 'slither',
                 swc_id: null,
                 severity: 'Low',
                 cvss: 1.8,
-                title: 'Gas Optimization: public vs external',
-                description: 'State read functions can be declared external to reduce deployment gas.',
+                title: 'Gas Optimization: public vs external visibility',
+                description: 'Functions that are never called internally should be declared external to reduce runtime gas.',
                 file: 'Contract.sol',
-                line: 12,
-                remediation: 'Change public visibility to external for read-only view calls.'
+                line: 14,
+                remediation: 'Declare function external to optimize stack memory handling.'
               }
             ],
             web2_findings: [],
-            secret_findings: [],
-            dependency_findings: [],
             attack_chains: [],
             total_critical: 0,
             total_high: 0,
             total_medium: 0,
             total_low: 1,
-            ipfs_cid: 'QmVerifiedStaticReportCID',
-            eas_attestation: '0xee9988cc77ffaa',
+            ipfs_cid: 'QmVerifiedStaticReportCID9921448',
+            eas_attestation: '0xee9988cc77ffaabbcc112233',
             badge_token_id: 42,
-            pipeline_duration_ms: 1500
+            pipeline_duration_ms: 1420
           });
         }
       } catch (e) {
-        console.error('Failed to load report:', e);
+        console.error(e);
       } finally {
         setLoading(false);
       }
@@ -67,239 +65,200 @@ export default function ReportClient() {
     fetchReport();
   }, [reportId]);
 
-  if (loading) {
+  if (loading || !report) {
     return (
-      <div className="min-h-screen bg-[#030303] text-white flex flex-col items-center justify-center">
-        <div className="w-12 h-12 rounded-full border-4 border-indigo-500/20 border-t-indigo-500 animate-spin mb-4" />
-        <p className="text-xs text-white/50 font-mono">Synthesizing Security Report...</p>
+      <div className="min-h-screen bg-[#F6F9FC] flex items-center justify-center text-slate-600 text-xs font-semibold">
+        Loading Verifiable Audit Report...
       </div>
     );
   }
 
-  if (!report) {
-    return (
-      <div className="min-h-screen bg-[#030303] text-white flex flex-col items-center justify-center gap-4">
-        <p className="text-base text-rose-400 font-bold">Report Not Found</p>
-        <Link href="/audit" className="bg-white/10 hover:bg-white/20 text-xs px-4 py-2 rounded-xl text-white">
-          Run New Audit
-        </Link>
-      </div>
-    );
-  }
-
-  const cvssColor = (score: number) => {
-    if (score >= 9.0) return 'text-rose-500 bg-rose-500/10 border-rose-500/30';
-    if (score >= 7.0) return 'text-orange-500 bg-orange-500/10 border-orange-500/30';
-    if (score >= 4.0) return 'text-amber-500 bg-amber-500/10 border-amber-500/30';
-    return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30';
-  };
-
-  const sevPill = (sev: string) => {
-    const s = sev.toLowerCase();
-    if (s === 'critical') return 'bg-rose-500/10 text-rose-400 border border-rose-500/20 text-[10px] px-2 py-0.5 rounded font-bold uppercase';
-    if (s === 'high') return 'bg-orange-500/10 text-orange-400 border border-orange-500/20 text-[10px] px-2 py-0.5 rounded font-bold uppercase';
-    if (s === 'medium') return 'bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] px-2 py-0.5 rounded font-bold uppercase';
-    return 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] px-2 py-0.5 rounded font-bold uppercase';
+  const getCvssPill = (cvss: number) => {
+    if (cvss >= 9.0) return 'bg-rose-50 text-rose-700 border-rose-200';
+    if (cvss >= 7.0) return 'bg-orange-50 text-orange-700 border-orange-200';
+    if (cvss >= 4.0) return 'bg-amber-50 text-amber-700 border-amber-200';
+    return 'bg-emerald-50 text-emerald-700 border-emerald-200';
   };
 
   return (
-    <div className="min-h-screen bg-[#030303] text-white flex flex-col font-sans selection:bg-indigo-500 selection:text-white pb-20">
-      <header className="border-b border-white/[0.06] bg-black/30 backdrop-blur-md sticky top-0 z-50">
+    <div className="min-h-screen bg-[#F6F9FC] text-slate-900 flex flex-col font-sans selection:bg-blue-600 selection:text-white pb-16">
+      {/* Header */}
+      <header className="border-b border-slate-200/80 bg-white/80 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-500 to-emerald-500 flex items-center justify-center font-bold text-black text-lg">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-600 to-cyan-500 flex items-center justify-center font-bold text-white text-lg shadow-sm shadow-blue-500/20">
               A
             </div>
-            <span className="font-extrabold text-xl tracking-tight bg-gradient-to-r from-white to-white/70 bg-clip-text text-transparent">
-              Audit<span className="text-indigo-400">X</span>
+            <span className="font-extrabold text-xl tracking-tight text-slate-900">
+              Audit<span className="text-blue-600">X</span>
             </span>
           </Link>
-          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-white/60">
-            <Link href="/dashboard" className="hover:text-white transition-colors">Dashboard</Link>
-            <Link href="/audit" className="hover:text-white transition-colors">New Audit</Link>
-            <Link href="/siem" className="hover:text-white transition-colors">SIEM Toolkit</Link>
+          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600">
+            <Link href="/dashboard" className="hover:text-blue-600 transition-colors">Dashboard</Link>
+            <Link href="/audit" className="hover:text-blue-600 transition-colors">New Audit</Link>
+            <Link href="/siem" className="hover:text-blue-600 transition-colors">SIEM Toolkit</Link>
           </nav>
-          <div className="flex items-center gap-4">
-            <span className="text-xs text-emerald-400 font-semibold bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-              Verified Report
-            </span>
-          </div>
         </div>
       </header>
 
-      <div className="max-w-7xl w-full mx-auto px-6 mt-8 flex-1 flex flex-col gap-6">
-        <div className="p-6 rounded-2xl bg-white/[0.01] border border-white/[0.06] flex flex-col md:flex-row md:items-center justify-between gap-6">
+      {/* Main Content */}
+      <main className="max-w-7xl w-full mx-auto px-6 py-8 flex flex-col gap-8 flex-1">
+        {/* Back Link & Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200/80 pb-6">
           <div className="flex flex-col gap-2">
-            <h1 className="text-2xl font-black">{report.project_name}</h1>
-            <span className="text-xs text-white/40">Audited on {new Date(report.audit_date).toUTCString()}</span>
-          </div>
-          
-          <div className="flex items-center gap-6">
-            <div className="flex flex-col items-end">
-              <span className="text-[10px] text-white/40 uppercase tracking-wider font-bold">System CVSS</span>
-              <span className={`text-3xl font-black px-3 py-1 rounded-lg border ${cvssColor(report.combined_cvss)}`}>
-                {report.combined_cvss.toFixed(1)}
+            <Link href="/dashboard" className="text-xs text-slate-500 hover:text-blue-600 flex items-center gap-1">
+              <ArrowLeft className="w-3.5 h-3.5" /> Back to Dashboard
+            </Link>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl sm:text-3xl font-black text-slate-900">{report.project_name || 'Security Audit Report'}</h1>
+              <span className={`text-xs font-bold px-3 py-0.5 rounded-full border ${getCvssPill(report.combined_cvss)}`}>
+                CVSS {report.combined_cvss}
               </span>
             </div>
           </div>
+
+          <div className="flex items-center gap-3">
+            {report.badge_token_id && (
+              <Link
+                href={`/badge/${report.badge_token_id}`}
+                className="bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 text-xs font-semibold px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 shadow-sm"
+              >
+                <ShieldCheck className="w-4 h-4 text-emerald-600" /> View Soulbound Badge #{report.badge_token_id}
+              </Link>
+            )}
+          </div>
         </div>
 
-        <div className="flex border-b border-white/[0.06] gap-6 text-sm font-semibold">
-          <button 
+        {/* Score Cards Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex flex-col gap-1">
+            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Overall CVSS Score</span>
+            <span className="text-3xl font-black text-slate-900">{report.combined_cvss}</span>
+            <span className="text-[11px] text-slate-500 mt-1 font-medium">Standard CVSS v3.1 Matrix</span>
+          </div>
+
+          <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex flex-col gap-1">
+            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Critical Vulnerabilities</span>
+            <span className="text-3xl font-black text-rose-600">{report.total_critical || 0}</span>
+            <span className="text-[11px] text-slate-500 mt-1 font-medium">Immediate Patch Required</span>
+          </div>
+
+          <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex flex-col gap-1">
+            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Web3 AST Findings</span>
+            <span className="text-3xl font-black text-blue-600">{report.web3_findings?.length || 0}</span>
+            <span className="text-[11px] text-slate-500 mt-1 font-medium">Slither + Mythril Engine</span>
+          </div>
+
+          <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex flex-col gap-1">
+            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">On-Chain Attestation</span>
+            <span className="text-xs font-mono font-bold text-slate-800 break-all truncate">
+              {report.eas_attestation ? 'Verified on EAS' : 'Not Attested'}
+            </span>
+            <span className="text-[11px] text-emerald-600 mt-1 font-semibold flex items-center gap-1">
+              <CheckCircle2 className="w-3 h-3" /> Sealed on IPFS
+            </span>
+          </div>
+        </div>
+
+        {/* Tab Navigation */}
+        <div className="flex items-center gap-3 border-b border-slate-200/80 pb-3">
+          <button
             onClick={() => setActiveTab('overview')}
-            className={`pb-3 relative transition-colors ${activeTab === 'overview' ? 'text-white' : 'text-white/40 hover:text-white/60'}`}
+            className={`text-xs font-bold px-4 py-2 rounded-xl transition-all ${
+              activeTab === 'overview'
+                ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/20'
+                : 'text-slate-600 hover:text-slate-900 bg-white border border-slate-200'
+            }`}
           >
             Overview
-            {activeTab === 'overview' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-500" />}
           </button>
-          <button 
+          <button
             onClick={() => setActiveTab('web3')}
-            className={`pb-3 relative transition-colors ${activeTab === 'web3' ? 'text-white' : 'text-white/40 hover:text-white/60'}`}
+            className={`text-xs font-bold px-4 py-2 rounded-xl transition-all ${
+              activeTab === 'web3'
+                ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/20'
+                : 'text-slate-600 hover:text-slate-900 bg-white border border-slate-200'
+            }`}
           >
-            Web3 Findings ({report.web3_findings.length})
-            {activeTab === 'web3' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-500" />}
+            Web3 Smart Contract Findings ({report.web3_findings?.length || 0})
           </button>
-          <button 
-            onClick={() => setActiveTab('web2')}
-            className={`pb-3 relative transition-colors ${activeTab === 'web2' ? 'text-white' : 'text-white/40 hover:text-white/60'}`}
-          >
-            Web2 Findings ({report.web2_findings.length})
-            {activeTab === 'web2' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-500" />}
-          </button>
-          <button 
-            onClick={() => setActiveTab('chains')}
-            className={`pb-3 relative transition-colors ${activeTab === 'chains' ? 'text-white' : 'text-white/40 hover:text-white/60'}`}
-          >
-            Attack Chains ({report.attack_chains.length})
-            {activeTab === 'chains' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-500" />}
-          </button>
-          <button 
-            onClick={() => setActiveTab('surya')}
-            className={`pb-3 relative transition-colors ${activeTab === 'surya' ? 'text-white' : 'text-white/40 hover:text-white/60'}`}
-          >
-            Call Graph Protocol
-            {activeTab === 'surya' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-500" />}
-          </button>
-          <button 
-            onClick={() => setActiveTab('forta')}
-            className={`pb-3 relative transition-colors ${activeTab === 'forta' ? 'text-white' : 'text-white/40 hover:text-white/60'}`}
-          >
-            Forta Bot Alerts
-            {activeTab === 'forta' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-500" />}
-          </button>
-          <button 
-            onClick={() => setActiveTab('pipeline')}
-            className={`pb-3 relative transition-colors ${activeTab === 'pipeline' ? 'text-white' : 'text-white/40 hover:text-white/60'}`}
-          >
-            Pipeline Details
-            {activeTab === 'pipeline' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-500" />}
-          </button>
-          <button 
+          <button
             onClick={() => setActiveTab('trust')}
-            className={`pb-3 relative transition-colors ${activeTab === 'trust' ? 'text-white' : 'text-white/40 hover:text-white/60'}`}
+            className={`text-xs font-bold px-4 py-2 rounded-xl transition-all ${
+              activeTab === 'trust'
+                ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/20'
+                : 'text-slate-600 hover:text-slate-900 bg-white border border-slate-200'
+            }`}
           >
-            Trust Layer
-            {activeTab === 'trust' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-500" />}
+            On-Chain Attestation & IPFS
           </button>
         </div>
 
-        <div className="flex-1">
-          {activeTab === 'overview' && (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div className="p-5 rounded-2xl bg-white/[0.01] border border-white/[0.06] flex flex-col gap-1">
-                <span className="text-[10px] text-white/40 font-bold uppercase tracking-wider">Critical Impact</span>
-                <span className="text-3xl font-black text-rose-500">{report.total_critical}</span>
+        {/* Findings List */}
+        {activeTab === 'overview' || activeTab === 'web3' ? (
+          <div className="flex flex-col gap-4">
+            {report.web3_findings?.length === 0 ? (
+              <div className="p-12 text-center bg-white rounded-2xl border border-slate-200/80 shadow-sm text-slate-500 text-xs">
+                🎉 No vulnerabilities detected! The contract passed all security rule checks.
               </div>
-              <div className="p-5 rounded-2xl bg-white/[0.01] border border-white/[0.06] flex flex-col gap-1">
-                <span className="text-[10px] text-white/40 font-bold uppercase tracking-wider">High Vulnerabilities</span>
-                <span className="text-3xl font-black text-orange-500">{report.total_high}</span>
-              </div>
-              <div className="p-5 rounded-2xl bg-white/[0.01] border border-white/[0.06] flex flex-col gap-1">
-                <span className="text-[10px] text-white/40 font-bold uppercase tracking-wider">Medium Risks</span>
-                <span className="text-3xl font-black text-amber-500">{report.total_medium}</span>
-              </div>
-              <div className="p-5 rounded-2xl bg-white/[0.01] border border-white/[0.06] flex flex-col gap-1">
-                <span className="text-[10px] text-white/40 font-bold uppercase tracking-wider">Low / Gas Optimizations</span>
-                <span className="text-3xl font-black text-emerald-400">{report.total_low}</span>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'web3' && (
-            <div className="p-6 rounded-2xl bg-white/[0.01] border border-white/[0.03]">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="text-white/40 border-b border-white/[0.06]">
-                    <th className="pb-3 pr-4 font-bold uppercase tracking-wide">Severity</th>
-                    <th className="pb-3 pr-4 font-bold uppercase tracking-wide">Title</th>
-                    <th className="pb-3 pr-4 font-bold uppercase tracking-wide">Tool</th>
-                    <th className="pb-3 pr-4 font-bold uppercase tracking-wide">File & Line</th>
-                    <th className="pb-3 font-bold uppercase tracking-wide">SWC Mapping</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {report.web3_findings.map((f: any, idx: number) => (
-                    <tr key={idx} className="border-b border-white/[0.04] hover:bg-white/[0.01] transition-colors">
-                      <td className="py-4 pr-4">{sevPill(f.severity)}</td>
-                      <td className="py-4 pr-4 font-bold">{f.title}</td>
-                      <td className="py-4 pr-4 font-mono text-indigo-400 text-[11px]">{f.tool}</td>
-                      <td className="py-4 pr-4 font-mono text-white/60 text-[11px]">{f.file}:{f.line || 'N/A'}</td>
-                      <td className="py-4 font-mono text-white/50 text-[11px]">{f.swc_id || 'N/A'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {activeTab === 'surya' && (
-            <div className="flex flex-col gap-6">
-              <div className="p-6 rounded-2xl bg-white/[0.01] border border-white/[0.03] flex flex-col gap-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex flex-col gap-1">
-                    <h3 className="font-bold text-sm">Surya AST Call Graph & Protocol Topology</h3>
-                    <p className="text-xs text-white/50">
-                      Visualizing contract function entrypoints, visibility nodes, and cross-subgraph call paths.
-                    </p>
-                  </div>
-                  <span className="text-[10px] text-indigo-400 font-bold bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-1 rounded-full uppercase">
-                    AST Graphviz Protocol
-                  </span>
-                </div>
-
-                <div className="p-6 rounded-xl bg-black border border-white/[0.08] flex items-center justify-center min-h-[260px] relative overflow-hidden">
-                  <div className="flex flex-col items-center gap-4 text-center">
-                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-indigo-500/20 to-emerald-500/20 border border-white/10 flex items-center justify-center">
-                      <Layers className="w-8 h-8 text-indigo-400" />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <span className="text-sm font-bold">Surya Protocol Subgraph Mapped</span>
-                      <span className="text-xs text-white/40 font-mono">
-                        Nodes: {report.web3_findings.length + 3} | Edges: {report.web3_findings.length * 2 + 4} | Inheritance Depth: 2
+            ) : (
+              report.web3_findings?.map((finding: any) => (
+                <div 
+                  key={finding.id}
+                  className="p-6 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex flex-col gap-3"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
+                        finding.severity === 'Critical' ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                        finding.severity === 'High' ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                        'bg-blue-50 text-blue-700 border-blue-200'
+                      }`}>
+                        {finding.severity}
                       </span>
+                      <h3 className="font-bold text-sm text-slate-900">{finding.title}</h3>
                     </div>
+                    <span className="text-xs font-mono text-slate-500">CVSS {finding.cvss}</span>
                   </div>
-                </div>
-              </div>
-            </div>
-          )}
 
-          {activeTab === 'trust' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="p-6 rounded-2xl bg-white/[0.01] border border-white/[0.03] flex flex-col gap-6">
-                <h3 className="font-bold text-sm">On-Chain Attestation Details</h3>
-                <div className="flex flex-col gap-1">
-                  <span className="text-[10px] text-white/40 font-bold uppercase tracking-wider">IPFS CID</span>
-                  <span className="text-xs font-mono break-all text-indigo-300">
-                    {report.ipfs_cid || 'N/A'}
-                  </span>
+                  <p className="text-xs text-slate-600 leading-relaxed">{finding.description}</p>
+
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 font-mono text-[11px] text-slate-700">
+                    <strong>File:</strong> {finding.file} | <strong>Line:</strong> {finding.line}
+                  </div>
+
+                  {finding.remediation && (
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-900">
+                      <strong>Remediation:</strong> {finding.remediation}
+                    </div>
+                  )}
                 </div>
+              ))
+            )}
+          </div>
+        ) : null}
+
+        {/* Trust Tab */}
+        {activeTab === 'trust' && (
+          <div className="p-6 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex flex-col gap-4">
+            <h3 className="font-bold text-sm text-slate-900">Cryptographic Verification & Seal</h3>
+            <div className="flex flex-col gap-3 text-xs">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-500 block mb-1">IPFS CID</span>
+                <span className="font-mono text-slate-800 bg-slate-50 p-2.5 rounded-lg border border-slate-200 block">
+                  {report.ipfs_cid}
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-500 block mb-1">Ethereum Attestation Service (EAS) UID</span>
+                <span className="font-mono text-slate-800 bg-slate-50 p-2.5 rounded-lg border border-slate-200 block">
+                  {report.eas_attestation}
+                </span>
               </div>
             </div>
-          )}
-        </div>
-      </div>
+          </div>
+        )}
+      </main>
     </div>
   );
 }
