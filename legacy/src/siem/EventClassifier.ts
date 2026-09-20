@@ -15,6 +15,23 @@ import type {
 
 // ─── Rule Table ──────────────────────────────────────────────────────────────
 
+function parseValueWei(valStr?: string | number): bigint {
+  if (valStr === undefined || valStr === null) return 0n;
+  const str = String(valStr).trim();
+  if (!str) return 0n;
+  try {
+    if (str.includes('.')) {
+      const parts = str.split('.');
+      const whole = BigInt(parts[0] || '0');
+      const frac = (parts[1] || '').padEnd(18, '0').slice(0, 18);
+      return whole * 10n ** 18n + BigInt(frac);
+    }
+    return BigInt(str);
+  } catch {
+    return 0n;
+  }
+}
+
 interface ClassifyRule {
   category: EventCategory;
   severity: EventSeverity;
@@ -92,15 +109,16 @@ const RULES: ClassifyRule[] = [
     category: 'REENTRANCY_SIGNAL',
     severity: 'HIGH',
     match(e) {
-      const val = BigInt(e.callValue ?? '0');
+      const val = parseValueWei(e.callValue);
       // High-gas + non-zero value transfer in a Withdrawal-like event
       if (
         (e.eventName.toLowerCase().includes('withdraw') ||
-          e.eventName.toLowerCase().includes('transfer')) &&
+          e.eventName.toLowerCase().includes('transfer') ||
+          e.eventName.toLowerCase().includes('fund-release')) &&
         e.gasUsed > 150_000 &&
         val > 0n
       ) {
-        return `High-gas withdrawal (${e.gasUsed} gas) — potential reentrancy`;
+        return `High-gas withdrawal/fund-release (${e.gasUsed} gas) — potential reentrancy`;
       }
       return null;
     },
@@ -203,19 +221,19 @@ const RULES: ClassifyRule[] = [
     category: 'LARGE_WITHDRAWAL',
     severity: 'HIGH',
     match(e) {
-      const val = BigInt(e.callValue ?? '0');
-      const THRESHOLD_WEI = BigInt('10000000000000000000'); // 10 ETH
+      const val = parseValueWei(e.callValue);
+      const THRESHOLD_WEI = 10n * 10n ** 18n; // 10 ETH
       if (
-        e.eventName.toLowerCase().includes('withdraw') &&
+        (e.eventName.toLowerCase().includes('withdraw') || e.eventName.toLowerCase().includes('fund-release')) &&
         val > THRESHOLD_WEI
       ) {
-        return `Large withdrawal: ${Number(val) / 1e18} ETH`;
+        return `Large withdrawal: ${Number(val / 10n ** 15n) / 1000} ETH`;
       }
       // Also check args for 'amount' in case it's a token withdrawal
-      const amount = BigInt((e.args['amount'] as string | undefined) ?? '0');
-      const TOKEN_THRESHOLD = BigInt('10000000000000000000'); // 10e18 tokens
+      const amount = parseValueWei(e.args['amount'] as string | undefined);
+      const TOKEN_THRESHOLD = 10n * 10n ** 18n; // 10e18 tokens
       if (
-        e.eventName.toLowerCase().includes('withdraw') &&
+        (e.eventName.toLowerCase().includes('withdraw') || e.eventName.toLowerCase().includes('fund-release')) &&
         amount > TOKEN_THRESHOLD
       ) {
         return `Large token withdrawal: ${amount.toString()} units`;

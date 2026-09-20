@@ -27,10 +27,12 @@ export default function SIEMDashboard() {
   const [activeTab, setActiveTab] = useState<'stream' | 'rules' | 'forta'>('stream');
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
 
+  const API_BASE = process.env.NEXT_PUBLIC_AUDITX_API_BASE || '';
+
   const fetchSIEMData = async () => {
     try {
-      const res = await fetch('/api/siem');
-      const fortaRes = await fetch('/api/forta/alerts');
+      const res = await fetch(`${API_BASE}/api/siem`);
+      const fortaRes = await fetch(`${API_BASE}/api/forta/alerts`);
       if (res.ok) {
         const data = await res.json();
         setEvents(data.events || []);
@@ -57,7 +59,7 @@ export default function SIEMDashboard() {
   const triggerSimulation = async (scenario: string) => {
     setSimulating(true);
     try {
-      const res = await fetch('/api/siem', {
+      const res = await fetch(`${API_BASE}/api/siem`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ scenario }),

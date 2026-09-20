@@ -6,6 +6,7 @@
   "scripts": {
     "test": "jest --config jest.config.cjs",
     "test:contracts": "npx hardhat test",
-    "test:siem": "jest --config jest.config.cjs test/siem.test.ts --verbose"
+    "test:siem": "jest --config jest.config.cjs test/siem.test.ts --verbose",
+    "e2e:polylance": "jest --config jest.config.cjs test/e2ePolylance.test.ts --verbose"
   }
 }

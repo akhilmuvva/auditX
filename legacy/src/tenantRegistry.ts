@@ -1,33 +1,19 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'crypto';
-import fs from 'fs';
+import { EventEmitter } from 'events';
 import path from 'path';
 import { setTimeout as sleep } from 'timers/promises';
 import type { Alert, ChainEvent } from './siem/types.js';
+import {
+  type ClientApp,
+  type MonitoredAddress,
+  type ITenantStore,
+  FileTenantStore,
+  MemoryTenantStore,
+  SqliteTenantStore,
+  PostgresTenantStore,
+} from './storage/tenantStore.js';
 
-export interface ClientApp {
-  id: string;
-  name: string;
-  webhookUrl: string;
-  apiKeyHash: string;
-  hmacSecret: string;
-  createdAt: string;
-}
-
-export interface MonitoredAddress {
-  id: string;
-  address: string;
-  chain: string;
-  owningApp: string;
-  webhookUrl: string;
-  apiKeyHash: string;
-  watchConfig: string[];
-  registeredAt: string;
-}
-
-interface RegistryFile {
-  clients: ClientApp[];
-  monitored: MonitoredAddress[];
-}
+export { ClientApp, MonitoredAddress, ITenantStore, FileTenantStore, MemoryTenantStore, SqliteTenantStore, PostgresTenantStore };
 
 export interface IssuedClientCredentials {
   client: ClientApp;
@@ -38,13 +24,47 @@ export interface IssuedClientCredentials {
 const ADDRESS_PATTERN = /^0x[a-fA-F0-9]{40}$/;
 const MAX_WATCH_CONFIG = 32;
 
-export class TenantRegistry {
-  private readonly filePath: string;
-  private state: RegistryFile;
+export class TenantRegistry extends EventEmitter {
+  private store: ITenantStore;
+  private syncCache: { clients: ClientApp[]; monitored: MonitoredAddress[] } = {
+    clients: [],
+    monitored: [],
+  };
 
-  constructor(filePath = process.env.AUDITX_REGISTRY_PATH || path.join(process.cwd(), 'auditx-tenant-registry.json')) {
-    this.filePath = filePath;
-    this.state = this.load();
+  constructor(storeOrPath?: ITenantStore | string) {
+    super();
+    if (!storeOrPath) {
+      const defaultPath = process.env.AUDITX_REGISTRY_PATH || path.join(process.cwd(), 'auditx-tenant-registry.json');
+      this.store = new FileTenantStore(defaultPath);
+    } else if (typeof storeOrPath === 'string') {
+      if (storeOrPath.startsWith('postgres://') || storeOrPath.startsWith('postgresql://')) {
+        this.store = new PostgresTenantStore(storeOrPath);
+      } else if (storeOrPath.endsWith('.db') || storeOrPath.endsWith('.sqlite')) {
+        this.store = new SqliteTenantStore(storeOrPath);
+      } else {
+        this.store = new FileTenantStore(storeOrPath);
+      }
+    } else {
+      this.store = storeOrPath;
+    }
+    this.initSync();
+  }
+
+  private initSync(): void {
+    if (this.store.listClientsSync && this.store.listAllMonitoredAddressesSync) {
+      this.syncCache = {
+        clients: this.store.listClientsSync(),
+        monitored: this.store.listAllMonitoredAddressesSync(),
+      };
+    }
+  }
+
+  async refreshCache(): Promise<void> {
+    const clients = await this.store.listClients();
+    const monitored = await this.store.listAllMonitoredAddresses();
+    this.syncCache = { clients, monitored };
+    this.emit('change', this.syncCache);
+    this.emit('monitored-changed', monitored);
   }
 
   static hashApiKey(apiKey: string): string {
@@ -56,11 +76,12 @@ export class TenantRegistry {
   }
 
   authenticate(apiKey: string): ClientApp | undefined {
+    if (!apiKey || typeof apiKey !== 'string') return undefined;
     const hash = TenantRegistry.hashApiKey(apiKey);
-    return this.state.clients.find((client) => {
-      const left = Buffer.from(client.apiKeyHash, 'hex');
-      const right = Buffer.from(hash, 'hex');
-      return left.length === right.length && timingSafeEqual(left, right);
+    const target = Buffer.from(hash, 'hex');
+    return this.syncCache.clients.find((client) => {
+      const candidate = Buffer.from(client.apiKeyHash, 'hex');
+      return candidate.length === target.length && timingSafeEqual(candidate, target);
     });
   }
 
@@ -78,8 +99,14 @@ export class TenantRegistry {
       hmacSecret,
       createdAt: new Date().toISOString(),
     };
-    this.state.clients.push(client);
-    this.persist();
+
+    this.syncCache.clients.push(client);
+    if (this.store.saveClientSync) {
+      this.store.saveClientSync(client);
+    } else {
+      this.store.saveClient(client).catch(console.error);
+    }
+    this.emit('client-registered', client);
     return { client, apiKey, hmacSecret };
   }
 
@@ -93,14 +120,41 @@ export class TenantRegistry {
     if (!client) throw new Error('Invalid API key');
     if (!ADDRESS_PATTERN.test(address)) throw new Error('Invalid monitored address');
     if (!chain.trim() || chain.length > 64) throw new Error('Invalid chain');
-    if (!Array.isArray(watchConfig) || watchConfig.length === 0 || watchConfig.length > MAX_WATCH_CONFIG
-      || watchConfig.some((eventType) => typeof eventType !== 'string' || !/^[a-z0-9-]{1,64}$/.test(eventType))) {
+    if (
+      !Array.isArray(watchConfig) ||
+      watchConfig.length === 0 ||
+      watchConfig.length > MAX_WATCH_CONFIG ||
+      watchConfig.some((eventType) => typeof eventType !== 'string' || !/^[a-z0-9-]{1,64}$/.test(eventType))
+    ) {
       throw new Error('Invalid watch configuration');
+    }
+
+    const normalizedAddr = address.toLowerCase();
+
+    // Check unique (owningApp, chain, address)
+    const existingIndex = this.syncCache.monitored.findIndex(
+      (m) =>
+        m.owningApp.toLowerCase() === client.name.toLowerCase() &&
+        m.chain.toLowerCase() === chain.toLowerCase() &&
+        m.address.toLowerCase() === normalizedAddr
+    );
+
+    if (existingIndex !== -1) {
+      const existing = this.syncCache.monitored[existingIndex];
+      existing.watchConfig = [...watchConfig];
+      existing.webhookUrl = client.webhookUrl;
+      if (this.store.saveMonitoredAddressSync) {
+        this.store.saveMonitoredAddressSync(existing);
+      } else {
+        this.store.saveMonitoredAddress(existing).catch(console.error);
+      }
+      this.emit('monitored-changed', this.syncCache.monitored);
+      return existing;
     }
 
     const monitored: MonitoredAddress = {
       id: `mon-${randomBytes(12).toString('hex')}`,
-      address: address.toLowerCase(),
+      address: normalizedAddr,
       chain,
       owningApp: client.name,
       webhookUrl: client.webhookUrl,
@@ -108,40 +162,54 @@ export class TenantRegistry {
       watchConfig: [...watchConfig],
       registeredAt: new Date().toISOString(),
     };
-    this.state.monitored.push(monitored);
-    this.persist();
+
+    this.syncCache.monitored.push(monitored);
+    if (this.store.saveMonitoredAddressSync) {
+      this.store.saveMonitoredAddressSync(monitored);
+    } else {
+      this.store.saveMonitoredAddress(monitored).catch(console.error);
+    }
+    this.emit('monitored-registered', monitored);
+    this.emit('monitored-changed', this.syncCache.monitored);
     return monitored;
   }
 
   listMonitoredAddresses(apiKey: string): MonitoredAddress[] {
     const client = this.authenticate(apiKey);
     if (!client) throw new Error('Invalid API key');
-    return this.state.monitored.filter((m) => m.apiKeyHash === client.apiKeyHash);
+    return this.syncCache.monitored.filter((m) => m.apiKeyHash === client.apiKeyHash);
   }
 
   listAllMonitoredAddresses(): MonitoredAddress[] {
-    return [...this.state.monitored];
+    return [...this.syncCache.monitored];
   }
 
   deregisterMonitoredAddress(apiKey: string, idOrAddress: string): boolean {
     const client = this.authenticate(apiKey);
     if (!client) throw new Error('Invalid API key');
     const target = idOrAddress.toLowerCase();
-    const index = this.state.monitored.findIndex(
+    const index = this.syncCache.monitored.findIndex(
       (m) => m.apiKeyHash === client.apiKeyHash && (m.id === idOrAddress || m.address === target),
     );
     if (index === -1) return false;
-    this.state.monitored.splice(index, 1);
-    this.persist();
+    this.syncCache.monitored.splice(index, 1);
+    if (this.store.deleteMonitoredAddressSync) {
+      this.store.deleteMonitoredAddressSync(client.apiKeyHash, target);
+    } else {
+      this.store.deleteMonitoredAddress(client.apiKeyHash, target).catch(console.error);
+    }
+    this.emit('monitored-deregistered', { apiKeyHash: client.apiKeyHash, target });
+    this.emit('monitored-changed', this.syncCache.monitored);
     return true;
   }
 
   lookupAddress(address: string): MonitoredAddress[] {
-    return this.state.monitored.filter((monitored) => monitored.address === address.toLowerCase());
+    const target = address.toLowerCase();
+    return this.syncCache.monitored.filter((monitored) => monitored.address === target);
   }
 
   async dispatchAlert(monitored: MonitoredAddress, alert: Alert): Promise<void> {
-    const client = this.state.clients.find((candidate) => candidate.apiKeyHash === monitored.apiKeyHash);
+    const client = this.syncCache.clients.find((candidate) => candidate.apiKeyHash === monitored.apiKeyHash);
     if (!client) throw new Error(`No client credentials found for ${monitored.owningApp}`);
 
     const payload = JSON.stringify({
@@ -183,24 +251,6 @@ export class TenantRegistry {
       if (attempt < 2) await sleep(100 * (attempt + 1));
     }
     throw new Error(lastError);
-  }
-
-  private load(): RegistryFile {
-    if (!fs.existsSync(this.filePath)) return { clients: [], monitored: [] };
-    const parsed: unknown = JSON.parse(fs.readFileSync(this.filePath, 'utf8'));
-    if (!parsed || typeof parsed !== 'object') throw new Error('Invalid tenant registry');
-    const value = parsed as Partial<RegistryFile>;
-    if (!Array.isArray(value.clients) || !Array.isArray(value.monitored)) {
-      throw new Error('Invalid tenant registry');
-    }
-    return { clients: value.clients as ClientApp[], monitored: value.monitored as MonitoredAddress[] };
-  }
-
-  private persist(): void {
-    const tempPath = `${this.filePath}.${process.pid}.tmp`;
-    fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
-    fs.writeFileSync(tempPath, JSON.stringify(this.state), { encoding: 'utf8', mode: 0o600 });
-    fs.renameSync(tempPath, this.filePath);
   }
 
   private validateWebhookUrl(webhookUrl: string): void {
@@ -258,6 +308,6 @@ export function bootstrapPolyLance(registry: TenantRegistry): void {
 }
 
 export function eventMatchesMonitoredAddress(event: ChainEvent, monitored: MonitoredAddress): boolean {
-  return event.contractAddress.toLowerCase() === monitored.address
+  return event.contractAddress.toLowerCase() === monitored.address.toLowerCase()
     && (monitored.watchConfig.length === 0 || monitored.watchConfig.includes(event.eventName.toLowerCase()));
 }
