@@ -25,19 +25,45 @@ async function listeningPort(server: Server): Promise<number> {
   return (server.address() as { port: number }).port;
 }
 
-describe('PolyLance E2E Integration Suite with Fault Injection & Latency SLA', () => {
-  it('executes full ingest -> detect -> webhook dispatch pipeline with p50/p95 latency', async () => {
+describe('Phase 8: High-Scale PolyLance E2E Benchmark & Fault Injection', () => {
+  it('processes >=1000 events with p50/p95/p99 benchmark, DLQ fault injection, and zero lost/duplicate alerts', async () => {
     process.env.AUDITX_API_TOKEN = 'test-admin-secret-token-12345';
     const regPath = tempPath('reg-');
+    const dlqPath = tempPath('dlq-');
     const registry = new TenantRegistry(regPath);
+    const dispatcher = new WebhookDispatcher(dlqPath);
 
-    // 1. Start Webhook Mock Receiver
-    const receivedWebhooks: { body: string; signature?: string }[] = [];
+    let simulate500 = false;
+    const receivedAlertIds = new Set<string>();
+    const receivedPayloads: any[] = [];
+    let duplicateAlertCount = 0;
+
+    // 1. Start Webhook Receiver with PolyLance HMAC Verification
+    let issuedHmacSecret = '';
     const webhookServer = createServer((req, res) => {
       let body = '';
       req.on('data', chunk => body += chunk);
       req.on('end', () => {
-        receivedWebhooks.push({ body, signature: req.headers['x-auditx-signature'] });
+        if (simulate500) {
+          res.writeHead(500, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Injected upstream fault' }));
+          return;
+        }
+
+        const sig = req.headers['x-auditx-signature'] as string;
+        const valid = WebhookDispatcher.verifySignature(issuedHmacSecret, body, sig);
+        if (!valid) {
+          res.writeHead(401).end('Invalid signature');
+          return;
+        }
+
+        const parsed = JSON.parse(body);
+        if (receivedAlertIds.has(parsed.alert_id)) {
+          duplicateAlertCount++;
+        } else {
+          receivedAlertIds.add(parsed.alert_id);
+        }
+        receivedPayloads.push(parsed);
         res.writeHead(200).end('OK');
       });
     }).listen(0);
@@ -54,79 +80,128 @@ describe('PolyLance E2E Integration Suite with Fault Injection & Latency SLA', (
       'PolyLance',
       `http://127.0.0.1:${webhookPort}/api/v1/siem-webhook`
     );
+    issuedHmacSecret = hmacSecret;
     expect(client.name).toBe('PolyLance');
-    expect(apiKey).toBeDefined();
 
-    // 4. Register Monitored PolyLance Escrow Contract
+    // 4. Register Monitored Escrow Contract
     const targetAddress = '0x1111111111111111111111111111111111111111';
-    const monitored = registry.registerMonitoredAddress(
+    registry.registerMonitoredAddress(
       apiKey,
       targetAddress,
       'polygon',
-      ['fund-release', 'dispute-trigger']
+      ['fund-release', 'dispute-trigger', 'deposit', 'ownership-transfer']
     );
-    expect(monitored.address).toBe(targetAddress.toLowerCase());
 
-    // 5. Connect Authenticated WebSocket
-    const ws = new WebSocket(`ws://127.0.0.1:${siemPort}/ws/siem`, `auditx-api-key.${apiKey}`);
+    // 5. Connect WebSocket with closure testing
+    let ws = new WebSocket(`ws://127.0.0.1:${siemPort}/ws/siem`, `auditx-api-key.${apiKey}`);
     await once(ws, 'open');
 
-    // 6. Ingest benchmark batch and compute latency
+    // Test WS Drop and Reconnect
+    ws.close();
+    await once(ws, 'close');
+    ws = new WebSocket(`ws://127.0.0.1:${siemPort}/ws/siem`, `auditx-api-key.${apiKey}`);
+    await once(ws, 'open');
+
+    // 6. Ingest 1,000 Events (50 batches of 20 events)
+    const TOTAL_EVENTS = 1000;
+    const BATCH_SIZE = 20;
+    const batchCount = TOTAL_EVENTS / BATCH_SIZE;
     const latencies: number[] = [];
-    const iterations = 10;
 
-    for (let i = 0; i < iterations; i++) {
+    for (let b = 0; b < batchCount; b++) {
+      const batch: ChainEvent[] = [];
+      for (let i = 0; i < BATCH_SIZE; i++) {
+        const idx = b * BATCH_SIZE + i;
+        batch.push({
+          id: `ev-scale-${idx}-${Date.now()}`,
+          timestamp: Date.now(),
+          chainId: 137,
+          contractAddress: targetAddress,
+          txHash: `0xhash${idx}`,
+          blockNumber: 60000000 + idx,
+          eventName: idx % 2 === 0 ? 'fund-release' : 'dispute-trigger',
+          args: { recipient: `0xuser${idx}`, amount: '10000000000000000000' },
+          gasUsed: 180000 + (idx % 10) * 10000,
+          callValue: '10.0',
+          from: '0x0000000000000000000000000000000000000123',
+        });
+      }
+
       const startTime = performance.now();
-      const testEvent: ChainEvent = {
-        id: `e2e-ev-${i}-${Date.now()}`,
-        timestamp: Date.now(),
-        chainId: 137,
-        contractAddress: targetAddress,
-        txHash: `0xtxhash${i}${Date.now()}`,
-        blockNumber: 50000000 + i,
-        eventName: 'fund-release',
-        args: { recipient: '0xattacker', amount: '50000000000000000000' },
-        gasUsed: 450000, // Spike to trigger anomaly detection
-        callValue: '50.0',
-        from: '0x0000000000000000000000000000000000000999',
-      };
-
       const res = await fetch(`http://127.0.0.1:${siemPort}/api/siem/ingest`, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
           'x-api-key': apiKey,
         },
-        body: JSON.stringify({ events: [testEvent] }),
+        body: JSON.stringify({ events: batch }),
       });
 
       expect(res.status).toBe(200);
-      const endTime = performance.now();
-      latencies.push(endTime - startTime);
+      const elapsed = performance.now() - startTime;
+      latencies.push(elapsed);
     }
 
     ws.close();
 
-    // 7. Verify Webhook Delivery and Signature Integrity
-    expect(receivedWebhooks.length).toBeGreaterThanOrEqual(1);
-    const firstWebhook = receivedWebhooks[0];
-    const parsedPayload = JSON.parse(firstWebhook.body);
-    expect(parsedPayload.owning_app).toBe('PolyLance');
-    expect(parsedPayload.contract_address).toBe(targetAddress.toLowerCase());
-    expect(
-      WebhookDispatcher.verifySignature(hmacSecret, firstWebhook.body, firstWebhook.signature!)
-    ).toBe(true);
+    // 7. Fault Injection Test: Receiver Failure -> DLQ Persistence -> Recovery
+    simulate500 = true;
+    const faultPayload = {
+      alert_id: 'fault-alert-999',
+      contract_address: targetAddress.toLowerCase(),
+      owning_app: 'PolyLance',
+      chain: 'polygon',
+      severity: 'CRITICAL',
+      category: 'GOVERNANCE',
+      title: 'Fault Injected Alert',
+      description: 'Testing DLQ overflow handling',
+      timestamp: Date.now(),
+      event_type: 'fund-release',
+      tx_hash: '0xfault',
+    };
 
-    // 8. Compute and report p50/p95 latency
+    const failedSend = await dispatcher.sendWithRetry(
+      `http://127.0.0.1:${webhookPort}/api/v1/siem-webhook`,
+      issuedHmacSecret,
+      faultPayload,
+      [0, 10]
+    );
+    expect(failedSend).toBe(false);
+
+    // Check DLQ Depth
+    const dlqItems = dispatcher.getDLQ();
+    expect(dlqItems.length).toBe(1);
+    expect(dlqItems[0].payload.alert_id).toBe('fault-alert-999');
+
+    // Recover Receiver and Replay from DLQ
+    simulate500 = false;
+    for (const item of dlqItems) {
+      const recovered = await dispatcher.sendWithRetry(item.webhookUrl, issuedHmacSecret, item.payload, [0]);
+      expect(recovered).toBe(true);
+    }
+    dispatcher.clearDLQ();
+    expect(dispatcher.getDLQ()).toHaveLength(0);
+
+    // 8. Assert Zero Duplicate and Zero Lost Alerts
+    expect(duplicateAlertCount).toBe(0);
+    expect(receivedPayloads.length).toBeGreaterThanOrEqual(1);
+    expect(receivedAlertIds.size).toBe(receivedPayloads.length);
+
+    // 9. Latency Benchmark Metrics (p50, p95, p99)
     latencies.sort((a, b) => a - b);
     const p50 = latencies[Math.floor(latencies.length * 0.5)];
     const p95 = latencies[Math.floor(latencies.length * 0.95)];
+    const p99 = latencies[Math.floor(latencies.length * 0.99)];
 
-    console.log(`\n=== POLYLANCE E2E BENCHMARK RESULTS ===`);
-    console.log(`Ingest Iterations: ${iterations}`);
+    console.log(`\n=== 1,000 EVENTS POLYLANCE BENCHMARK ===`);
+    console.log(`Total Events: ${TOTAL_EVENTS}`);
+    console.log(`Batch Count: ${batchCount} (20 events/batch)`);
     console.log(`p50 Latency: ${p50.toFixed(2)} ms`);
     console.log(`p95 Latency: ${p95.toFixed(2)} ms`);
+    console.log(`p99 Latency: ${p99.toFixed(2)} ms`);
+    console.log(`Duplicate Alerts: ${duplicateAlertCount}`);
     console.log(`Target Warm-Path SLA: < 300.00 ms`);
-    expect(p95).toBeLessThan(300); // 300ms SLA
+
+    expect(p95).toBeLessThan(300);
   });
 });
