@@ -12,13 +12,16 @@ module.exports = {
     '/AuditRegistry.test.ts',
     '/ResumeRegistry.test.ts'
   ],
+  modulePathIgnorePatterns: ['<rootDir>/cache/'],
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
       useESM: true,
+      tsconfig: '<rootDir>/tsconfig.json',
     }],
   },
   extensionsToTreatAsEsm: ['.ts'],
   moduleNameMapper: {
+    '^@auditx/types$': '<rootDir>/types/index.ts',
     '^(\\.{1,2}/.*)\\.js$': '$1',
   },
 };

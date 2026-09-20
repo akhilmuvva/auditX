@@ -29,6 +29,7 @@ export async function POST(request: Request) {
     // Otherwise, attempt to run the Rust binary
     // Write solidity code to temp file
     const tempContractPath = path.join(REPORTS_CACHE_DIR, fileName || 'Contract.sol');
+    const reportPath = path.join(REPORTS_CACHE_DIR, `${auditId}.json`);
     fs.writeFileSync(tempContractPath, code || '');
 
     // Construct Rust execution command via WSL for real-time compilation & execution

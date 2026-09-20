@@ -22,6 +22,7 @@ fn test_offline_cid_matches_ipfs_format() {
         total_high: 0,
         total_medium: 0,
         total_low: 0,
+        pipeline_duration_ms: 0,
     };
     
     let cid = client.generate_offline_cid(&report);
@@ -50,6 +51,7 @@ fn test_cid_deterministic() {
         total_high: 0,
         total_medium: 0,
         total_low: 0,
+        pipeline_duration_ms: 0,
     };
     
     let report2 = report1.clone();

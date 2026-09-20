@@ -92,34 +92,48 @@ describe('TenantRegistry', () => {
 
 describe('SIEM WebSocket authentication', () => {
   it('rejects unauthenticated SIEM REST requests', async () => {
-    process.env.AUDITX_API_TOKEN = 'test-admin-token';
-    process.env.AUDITX_REGISTRY_PATH = tempRegistryPath();
-    const { startServer } = await import('../legacy/src/server.js');
-    const server = startServer(0);
-    servers.push(server);
-    const port = await listeningPort(server);
+    try {
+      process.env.AUDITX_API_TOKEN = 'test-admin-token';
+      const filePath = tempRegistryPath();
+      process.env.AUDITX_REGISTRY_PATH = filePath;
+      const { startServer } = await import('../legacy/src/server.js');
+      const registry = new TenantRegistry(filePath);
+      const server = startServer(0, registry);
+      servers.push(server);
+      const port = await listeningPort(server);
 
-    const response = await new Promise<{ statusCode?: number }>((resolve, reject) => {
-      const request = httpRequest({ hostname: '127.0.0.1', port, path: '/api/siem/alerts' }, (response) => {
-        response.resume();
-        response.on('end', () => resolve(response));
+      const response = await new Promise<{ statusCode?: number }>((resolve, reject) => {
+        const request = httpRequest({ hostname: '127.0.0.1', port, path: '/api/siem/alerts' }, (response) => {
+          response.resume();
+          response.on('end', () => resolve(response));
+        });
+        request.on('error', reject);
+        request.end();
       });
-      request.on('error', reject);
-      request.end();
-    });
-    expect(response.statusCode).toBe(401);
+      expect(response.statusCode).toBe(401);
+    } catch (err) {
+      console.error('[REST TEST ERROR]:', err);
+      throw err;
+    }
   });
 
   it('closes unauthenticated handshakes', async () => {
-    process.env.AUDITX_API_TOKEN = 'test-admin-token';
-    process.env.AUDITX_REGISTRY_PATH = tempRegistryPath();
-    const { startServer } = await import('../legacy/src/server.js');
-    const server = startServer(0);
-    servers.push(server);
-    const port = await listeningPort(server);
+    try {
+      process.env.AUDITX_API_TOKEN = 'test-admin-token';
+      const filePath = tempRegistryPath();
+      process.env.AUDITX_REGISTRY_PATH = filePath;
+      const { startServer } = await import('../legacy/src/server.js');
+      const registry = new TenantRegistry(filePath);
+      const server = startServer(0, registry);
+      servers.push(server);
+      const port = await listeningPort(server);
 
-    const socket = new WebSocket(`ws://127.0.0.1:${port}/ws/siem`);
-    const [code] = await once(socket, 'close');
-    expect(code).toBe(1008);
+      const socket = new WebSocket(`ws://127.0.0.1:${port}/ws/siem`);
+      const [code] = await once(socket, 'close');
+      expect(code).toBe(1008);
+    } catch (err) {
+      console.error('[WS TEST ERROR]:', err);
+      throw err;
+    }
   });
 });

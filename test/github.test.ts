@@ -1,4 +1,4 @@
-import { parseGithubImport, findSolFiles } from '../src/utils/github.js';
+import { parseGithubImport, findSolFiles } from '../legacy/src/utils/github.js';
 import { describe, it, expect, jest } from '@jest/globals';
 import fs from 'fs';
 import path from 'path';

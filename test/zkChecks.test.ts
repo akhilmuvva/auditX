@@ -1,4 +1,4 @@
-import { runZKChecks } from '../src/analysis/zkChecks.js';
+import { runZKChecks } from '../legacy/src/analysis/zkChecks.js';
 import path from 'path';
 import { describe, it, expect } from '@jest/globals';
 

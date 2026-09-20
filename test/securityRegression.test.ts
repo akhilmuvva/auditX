@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 
 
-const root = path.resolve(process.cwd(), '..');
+const root = process.cwd();
 
 describe('security regression guards', () => {
   it('keeps badge token rendering numeric and free of raw HTML injection', () => {

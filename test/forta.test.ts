@@ -1,5 +1,5 @@
-import { generateFortaBot, analyzeDeployedContract } from '../src/forta/index.js';
-import { lookupAttestation } from '../src/pipeline.js';
+import { generateFortaBot, analyzeDeployedContract } from '../legacy/src/forta/index.js';
+import { lookupAttestation } from '../legacy/src/pipeline.js';
 import { describe, it, expect, jest } from '@jest/globals';
 
 // Mock the public GraphQL API requests to ensure test suite remains fast and local-compliant
@@ -47,7 +47,7 @@ jest.mock('graphql-request', () => ({
 }));
 
 // Mock the subgraph query
-jest.mock('../src/storage/theGraph.js', () => ({
+jest.mock('../legacy/src/storage/theGraph.js', () => ({
   queryAuditsByContract: jest.fn().mockImplementation(async (hash: any) => {
     if (hash === '0xexisting') {
       return [{

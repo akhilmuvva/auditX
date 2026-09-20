@@ -31,7 +31,7 @@ async fn test_vulnerable_vault_web3_only() {
     if let Ok(findings_list) = findings {
         // Our custom MEV or flash loan/governance detectors might pick it up,
         // or we check that the function returns without crashing.
-        assert!(findings_list.is_array() || findings_list.is_empty() || !findings_list.is_empty());
+        assert!(findings_list.is_empty() || !findings_list.is_empty());
     }
 }
 

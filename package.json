@@ -1,0 +1,11 @@
+{
+  "name": "auditx",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "jest --config jest.config.cjs",
+    "test:contracts": "npx hardhat test",
+    "test:siem": "jest --config jest.config.cjs test/siem.test.ts --verbose"
+  }
+}

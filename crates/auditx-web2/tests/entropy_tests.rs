@@ -19,8 +19,8 @@ fn test_ethereum_key_pattern() {
     let source_dir = std::env::current_dir().unwrap();
     // Verify directory scanner filters
     let mock_dir = source_dir.join("crates/auditx-web2/tests");
-    let findings = auditx_web2::secrets::scan_directory_for_secrets(&mock_dir);
+    let findings = auditx_web2::secrets::detect_secrets(&mock_dir);
     
     // It shouldn't crash and returns vector
-    assert!(findings.is_ok() || findings.is_empty() || !findings.is_empty());
+    assert!(findings.is_ok());
 }

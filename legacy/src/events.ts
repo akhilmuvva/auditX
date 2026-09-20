@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import type { StepId, StepStatus, StepEvent } from '@auditx/types';
+import type { StepId, StepStatus, StepEvent } from '../types/index.js';
 
 export const auditEmitter = new EventEmitter();
 

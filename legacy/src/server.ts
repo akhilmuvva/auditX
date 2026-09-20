@@ -28,8 +28,16 @@ siemEngine.train([]).then(() => {
 
 // Track ongoing scans per client session
 const activeSessions = new Map<string, boolean>();
-const tenantRegistry = new TenantRegistry();
+let tenantRegistry = new TenantRegistry();
 bootstrapPolyLance(tenantRegistry);
+
+export function getTenantRegistry(): TenantRegistry {
+  return tenantRegistry;
+}
+
+export function setTenantRegistry(registry: TenantRegistry): void {
+  tenantRegistry = registry;
+}
 
 function hasApiAccess(req: Pick<Request, 'headers'> & { url?: string }): boolean {
   const expected = process.env.AUDITX_API_TOKEN;
@@ -94,7 +102,10 @@ function validateEvents(events: unknown): events is ChainEvent[] {
   return Array.isArray(events) && events.length > 0 && events.length <= 1000 && events.every(isValidChainEvent);
 }
 
-export function startServer(port: number = 3000) {
+export function startServer(port: number = 3000, registry?: TenantRegistry) {
+  if (registry) {
+    tenantRegistry = registry;
+  }
   const app = express();
   const httpServer = createServer(app);
 
@@ -103,6 +114,17 @@ export function startServer(port: number = 3000) {
     server: httpServer,
     path: '/ws/siem',
     handleProtocols: (protocols) => [...protocols].find((protocol) => protocol.startsWith('auditx-api-key.')) || '',
+  });
+
+  httpServer.on('close', () => {
+    try {
+      wss.close();
+      for (const client of wss.clients) {
+        client.terminate();
+      }
+    } catch {
+      // ignore
+    }
   });
 
   /** Broadcast an alert to all connected SIEM dashboard clients */

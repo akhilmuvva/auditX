@@ -1,7 +1,7 @@
-use auditx_web3::{
-    flash_loan::detect_flash_loan_patterns,
-    signature_replay::detect_signature_replay,
-    mev::detect_mev_patterns,
+use auditx_web3::detectors::{
+    flash_loan::detect as detect_flash_loan_patterns,
+    signature_replay::detect as detect_signature_replay,
+    mev::detect as detect_mev_patterns,
 };
 
 #[test]
