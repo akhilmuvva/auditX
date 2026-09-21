@@ -11,6 +11,7 @@
  */
 
 export * from './types.js';
+export { StateTracker } from './StateTracker.js';
 export { EventClassifier } from './EventClassifier.js';
 export { AnomalyDetector } from './AnomalyDetector.js';
 export { ThreatIntelligence } from './ThreatIntelligence.js';

@@ -1,198 +1,337 @@
-// @ts-nocheck
+import { describe, it, expect, beforeEach } from '@jest/globals';
 import { EventClassifier } from '../legacy/src/siem/EventClassifier.js';
+import { StateTracker } from '../legacy/src/siem/StateTracker.js';
 import type { ChainEvent } from '../legacy/src/siem/types.js';
 
-describe('Phase 4: PolyLance Escrow Security Detection Rules Matrix', () => {
-  const classifier = new EventClassifier();
+describe('Phase 4: PolyLance Escrow Security Threat Rules (StateTracker + Real Event Fields)', () => {
+  let tracker: StateTracker;
+  let classifier: EventClassifier;
+  const cloneAddress = '0x1111111111111111111111111111111111111111';
+  const factoryAddress = '0xbE74923BBfd72d400a681915dBcf6e6Adc72C317';
+  const clientAddress = '0x2222222222222222222222222222222222222222';
+  const freelancerAddress = '0x3333333333333333333333333333333333333333';
+  const authorizedJudge = '0x25F6C8ed995C811E6c0ADb1D66A60830E8115e9A';
+  const unauthorizedAttacker = '0x9999999999999999999999999999999999999999';
 
-  function baseEvent(eventName: string, args: Record<string, any> = {}): ChainEvent {
+  beforeEach(() => {
+    tracker = new StateTracker();
+    tracker.addFactoryAddress(factoryAddress);
+    classifier = new EventClassifier(tracker);
+  });
+
+  function createRealEvent(
+    contract: string,
+    eventName: string,
+    args: Record<string, unknown>,
+    txHash: string = '0x4f8a12bc90de45f678901234567890abcdef1234567890abcdef1234567890ab',
+    timestampMs: number = 1700000000000
+  ): ChainEvent {
     return {
-      id: `ev-test-${Date.now()}-${Math.random()}`,
-      timestamp: Date.now(),
+      id: `ev-${txHash}-${Math.random()}`,
+      timestamp: timestampMs,
       chainId: 137,
-      contractAddress: '0xbe74923bbfd72d400a681915dbcf6e6adc72c317',
-      txHash: '0x4f8a12bc90de45f678901234567890abcdef1234567890abcdef1234567890ab',
+      contractAddress: contract.toLowerCase(),
+      txHash,
       blockNumber: 50000000,
       eventName,
       args,
-      gasUsed: 80000,
+      gasUsed: 85000,
       callValue: '0',
-      from: '0x1234567890123456789012345678901234567890',
+      from: clientAddress.toLowerCase(),
     };
   }
 
-  // ── Rule 1: PaymentReleased without Funding or Submitted Work ───────────────
-  describe('Rule 1: Unfunded/Unsubmitted Release Bypass', () => {
-    it('POSITIVE: triggers CRITICAL alert when PaymentReleased occurs without funding or work submission', () => {
-      const ev = baseEvent('PaymentReleased', {
-        unfunded: true,
-        toFreelancer: '1000000000000000000',
-        fee: '25000000000000000',
+  // ── Rule 1: PaymentReleased Validation ──────────────────────────────────────
+  describe('Rule 1: PaymentReleased Integrity (Unfunded, Unsubmitted, Overflow)', () => {
+    it('POSITIVE: flags CRITICAL when PaymentReleased is emitted on an unfunded clone', () => {
+      // Step 1: Clone deployed and posted, but never funded
+      tracker.recordEvent(createRealEvent(factoryAddress, 'JobDeployed', {
+        jobContract: cloneAddress,
+        client: clientAddress,
+        paymentToken: '0xtoken',
+      }));
+
+      // Step 2: PaymentReleased arrives
+      const releaseEvent = createRealEvent(cloneAddress, 'PaymentReleased', {
+        toFreelancer: 975000000000000000n,
+        fee: 25000000000000000n,
       });
-      const classified = classifier.classify(ev);
+
+      const classified = classifier.classify(releaseEvent);
       expect(classified.ruleSeverity).toBe('CRITICAL');
       expect(classified.category).toBe('GOVERNANCE');
-      expect(classified.reason).toContain('PaymentReleased without required funding');
+      expect(classified.reason).toContain('PaymentReleased on unfunded escrow clone');
     });
 
-    it('POSITIVE: triggers CRITICAL alert when PaymentReleased amount exceeds fundedAmount', () => {
-      const ev = baseEvent('PaymentReleased', {
-        fundedAmount: '1000000000000000000',
-        toFreelancer: '2000000000000000000',
-        fee: '50000000000000000',
+    it('POSITIVE: flags CRITICAL when PaymentReleased is emitted without submitted work deliverable', () => {
+      // Clone deployed and funded, but work was never submitted
+      tracker.recordEvent(createRealEvent(factoryAddress, 'JobDeployed', {
+        jobContract: cloneAddress,
+        client: clientAddress,
+        paymentToken: '0xtoken',
+      }));
+      tracker.recordEvent(createRealEvent(cloneAddress, 'JobFunded', {
+        amount: 1000000000000000000n,
+      }));
+
+      const releaseEvent = createRealEvent(cloneAddress, 'PaymentReleased', {
+        toFreelancer: 975000000000000000n,
+        fee: 25000000000000000n,
       });
-      const classified = classifier.classify(ev);
+
+      const classified = classifier.classify(releaseEvent);
       expect(classified.ruleSeverity).toBe('CRITICAL');
-      expect(classified.reason).toContain('PaymentReleased without required funding');
+      expect(classified.reason).toContain('without submitted work deliverable');
     });
 
-    it('NEGATIVE: normal PaymentReleased within funded balance does not trigger bypass rule', () => {
-      const ev = baseEvent('PaymentReleased', {
-        fundedAmount: '1000000000000000000',
-        toFreelancer: '975000000000000000',
-        fee: '25000000000000000',
-        feeBps: 250,
+    it('POSITIVE: flags CRITICAL when released sum exceeds funded balance (overflow drain)', () => {
+      // Funded with 1 token
+      tracker.recordEvent(createRealEvent(factoryAddress, 'JobDeployed', {
+        jobContract: cloneAddress,
+        client: clientAddress,
+        paymentToken: '0xtoken',
+      }));
+      tracker.recordEvent(createRealEvent(cloneAddress, 'JobFunded', {
+        amount: 1000000000000000000n,
+      }));
+      tracker.recordEvent(createRealEvent(cloneAddress, 'WorkSubmitted', {
+        title: 'SIEM Audit Report',
+        evidenceCount: 2n,
+      }));
+
+      // Release attempts 2 tokens (toFreelancer = 1.95, fee = 0.05 -> total 2.0 > 1.0)
+      const releaseEvent = createRealEvent(cloneAddress, 'PaymentReleased', {
+        toFreelancer: 1950000000000000000n,
+        fee: 50000000000000000n,
       });
-      const classified = classifier.classify(ev);
-      expect(classified.ruleSeverity).not.toBe('CRITICAL');
+
+      const classified = classifier.classify(releaseEvent);
+      expect(classified.ruleSeverity).toBe('CRITICAL');
+      expect(classified.category).toBe('LARGE_WITHDRAWAL');
+      expect(classified.reason).toContain('exceeds funded escrow amount');
+    });
+
+    it('NEGATIVE: legitimate PaymentReleased with funding, submitted work, and valid amount passes with INFO', () => {
+      tracker.recordEvent(createRealEvent(factoryAddress, 'JobDeployed', {
+        jobContract: cloneAddress,
+        client: clientAddress,
+        paymentToken: '0xtoken',
+      }));
+      tracker.recordEvent(createRealEvent(cloneAddress, 'JobFunded', {
+        amount: 1000000000000000000n,
+      }));
+      tracker.recordEvent(createRealEvent(cloneAddress, 'WorkSubmitted', {
+        title: 'SIEM Audit Report',
+        evidenceCount: 2n,
+      }));
+
+      const releaseEvent = createRealEvent(cloneAddress, 'PaymentReleased', {
+        toFreelancer: 975000000000000000n,
+        fee: 25000000000000000n,
+      });
+
+      const classified = classifier.classify(releaseEvent);
+      expect(classified.ruleSeverity).toBe('INFO');
+      expect(classified.reason).toContain('Legitimate payment released');
     });
   });
 
-  // ── Rule 2: DisputeResolved by Non-Arbitrator or Invalid Split ──────────────
-  describe('Rule 2: Unauthorized Dispute Resolution', () => {
-    it('POSITIVE: triggers CRITICAL alert when DisputeResolved is called by unauthorized judge', () => {
-      const ev = baseEvent('DisputeResolved', {
-        isArbitrator: false,
-        judge: '0x9999999999999999999999999999999999999999',
-        freelancerBps: 5000,
+  // ── Rule 2: Dispute Resolution Authority ────────────────────────────────────
+  describe('Rule 2: Dispute Resolution by Non-Arbitrator or Invalid Split', () => {
+    it('POSITIVE: flags CRITICAL when DisputeResolved is emitted with an unauthorized judge', () => {
+      const disputeEvent = createRealEvent(cloneAddress, 'DisputeResolved', {
+        judge: unauthorizedAttacker,
+        freelancerBps: 5000n,
+        reasoningIpfsHash: 'QmTestRuling',
       });
-      const classified = classifier.classify(ev);
+
+      const classified = classifier.classify(disputeEvent);
       expect(classified.ruleSeverity).toBe('CRITICAL');
       expect(classified.category).toBe('GOVERNANCE');
-      expect(classified.reason).toContain('Unauthorized dispute resolution');
+      expect(classified.reason).toContain('unauthorized non-arbitrator account');
     });
 
-    it('POSITIVE: triggers CRITICAL alert when freelancerBps > 10000 (> 100%)', () => {
-      const ev = baseEvent('DisputeResolved', {
-        isArbitrator: true,
-        judge: '0x25F6C8ed995C811E6c0ADb1D66A60830E8115e9A',
-        freelancerBps: 15000,
+    it('POSITIVE: flags CRITICAL when DisputeResolved split exceeds 10,000 bps (100%)', () => {
+      const disputeEvent = createRealEvent(cloneAddress, 'DisputeResolved', {
+        judge: authorizedJudge,
+        freelancerBps: 15000n,
+        reasoningIpfsHash: 'QmInvalidSplitRuling',
       });
-      const classified = classifier.classify(ev);
+
+      const classified = classifier.classify(disputeEvent);
       expect(classified.ruleSeverity).toBe('CRITICAL');
-      expect(classified.reason).toContain('invalid split (15000 bps)');
+      expect(classified.reason).toContain('Invalid dispute resolution split (15000 bps > 10000)');
     });
 
-    it('NEGATIVE: valid DisputeResolved by authorized arbitrator with valid bps passes normally', () => {
-      const ev = baseEvent('DisputeResolved', {
-        isArbitrator: true,
-        judge: '0x25F6C8ed995C811E6c0ADb1D66A60830E8115e9A',
-        freelancerBps: 7000,
+    it('NEGATIVE: DisputeResolved by authorized arbitrator with valid bps passes normally', () => {
+      const disputeEvent = createRealEvent(cloneAddress, 'DisputeResolved', {
+        judge: authorizedJudge,
+        freelancerBps: 8000n,
+        reasoningIpfsHash: 'QmValidRuling',
       });
-      const classified = classifier.classify(ev);
-      expect(classified.ruleSeverity).not.toBe('CRITICAL');
+
+      const classified = classifier.classify(disputeEvent);
+      expect(classified.ruleSeverity).toBe('LOW');
+      expect(classified.reason).toContain('Dispute resolved legitimately');
     });
   });
 
   // ── Rule 3: Premature AutoReleased ──────────────────────────────────────────
-  describe('Rule 3: Premature AutoRelease', () => {
-    it('POSITIVE: triggers HIGH alert when AutoReleased occurs before reviewPeriod has elapsed', () => {
-      const ev = baseEvent('AutoReleased', {
-        premature: true,
-        elapsedSeconds: 86400, // 1 day instead of 7 days
-        reviewPeriod: 604800, // 7 days
-      });
-      const classified = classifier.classify(ev);
+  describe('Rule 3: Premature AutoRelease before Review Period', () => {
+    it('POSITIVE: flags HIGH when AutoReleased is emitted before 7-day review period expires', () => {
+      const workTimestampMs = 1700000000000;
+      // Work submitted at t = 1,700,000,000s
+      tracker.recordEvent(createRealEvent(cloneAddress, 'WorkSubmitted', {
+        title: 'Deliverable',
+        evidenceCount: 1n,
+      }, '0xtx_work', workTimestampMs));
+
+      // AutoRelease claimed only 1 day later (86,400s < 604,800s review period)
+      const prematureTimestampMs = workTimestampMs + (86400 * 1000);
+      const autoEvent = createRealEvent(cloneAddress, 'AutoReleased', {}, '0xtx_auto', prematureTimestampMs);
+
+      const classified = classifier.classify(autoEvent);
       expect(classified.ruleSeverity).toBe('HIGH');
       expect(classified.category).toBe('GOVERNANCE');
-      expect(classified.reason).toContain('Premature auto-release');
+      expect(classified.reason).toContain('Premature auto-release: escrow claimed before mandatory review period elapsed');
     });
 
-    it('NEGATIVE: AutoReleased after review period has elapsed passes without anomaly', () => {
-      const ev = baseEvent('AutoReleased', {
-        premature: false,
-        elapsedSeconds: 700000, // > 7 days
-        reviewPeriod: 604800,
-      });
-      const classified = classifier.classify(ev);
-      expect(classified.ruleSeverity).not.toBe('HIGH');
+    it('NEGATIVE: AutoReleased claimed after 7-day review period passes as LOW severity', () => {
+      const workTimestampMs = 1700000000000;
+      tracker.recordEvent(createRealEvent(cloneAddress, 'WorkSubmitted', {
+        title: 'Deliverable',
+        evidenceCount: 1n,
+      }, '0xtx_work', workTimestampMs));
+
+      // AutoRelease claimed 8 days later (691,200s > 604,800s review period)
+      const validTimestampMs = workTimestampMs + (8 * 86400 * 1000);
+      const autoEvent = createRealEvent(cloneAddress, 'AutoReleased', {}, '0xtx_auto_valid', validTimestampMs);
+
+      const classified = classifier.classify(autoEvent);
+      expect(classified.ruleSeverity).toBe('LOW');
+      expect(classified.reason).toContain('Auto-release claimed legitimately');
     });
   });
 
-  // ── Rule 4: Platform Fee Anomaly (>2.5%) ────────────────────────────────────
-  describe('Rule 4: Platform Fee Anomaly', () => {
-    it('POSITIVE: triggers HIGH alert when fee exceeds 2.5% (250 bps)', () => {
-      const ev = baseEvent('FeeCollected', {
-        feeBps: 500, // 5%
-        amount: '50000000000000000',
+  // ── Rule 4: Platform Fee Anomaly ────────────────────────────────────────────
+  describe('Rule 4: Platform Fee Ratio Anomaly', () => {
+    it('POSITIVE: flags HIGH when fee ratio deviates from configured 250 bps (e.g. 1000 bps / 10%)', () => {
+      tracker.recordEvent(createRealEvent(factoryAddress, 'JobDeployed', {
+        jobContract: cloneAddress,
+        client: clientAddress,
+        paymentToken: '0xtoken',
+      }));
+      tracker.recordEvent(createRealEvent(cloneAddress, 'JobFunded', {
+        amount: 1000000000000000000n,
+      }));
+      tracker.recordEvent(createRealEvent(cloneAddress, 'WorkSubmitted', {
+        title: 'Work',
+        evidenceCount: 1n,
+      }));
+
+      // Fee is 100 / 1000 = 10% (1000 bps != 250 bps)
+      const anomalyFeeEvent = createRealEvent(cloneAddress, 'PaymentReleased', {
+        toFreelancer: 900000000000000000n,
+        fee: 100000000000000000n,
       });
-      const classified = classifier.classify(ev);
+
+      const classified = classifier.classify(anomalyFeeEvent);
       expect(classified.ruleSeverity).toBe('HIGH');
       expect(classified.category).toBe('GOVERNANCE');
-      expect(classified.reason).toContain('Platform fee rate anomaly');
+      expect(classified.reason).toContain('Platform fee anomaly: fee ratio 1000 bps deviates from configured platform fee (250 bps)');
     });
 
-    it('NEGATIVE: FeeCollected at exactly 2.5% (250 bps) passes normally', () => {
-      const ev = baseEvent('FeeCollected', {
-        feeBps: 250,
-        amount: '25000000000000000',
+    it('NEGATIVE: PaymentReleased with standard 250 bps (2.5%) fee passes without anomaly', () => {
+      tracker.recordEvent(createRealEvent(factoryAddress, 'JobDeployed', {
+        jobContract: cloneAddress,
+        client: clientAddress,
+        paymentToken: '0xtoken',
+      }));
+      tracker.recordEvent(createRealEvent(cloneAddress, 'JobFunded', {
+        amount: 1000000000000000000n,
+      }));
+      tracker.recordEvent(createRealEvent(cloneAddress, 'WorkSubmitted', {
+        title: 'Work',
+        evidenceCount: 1n,
+      }));
+
+      const normalFeeEvent = createRealEvent(cloneAddress, 'PaymentReleased', {
+        toFreelancer: 975000000000000000n,
+        fee: 25000000000000000n,
       });
-      const classified = classifier.classify(ev);
-      expect(classified.ruleSeverity).not.toBe('HIGH');
+
+      const classified = classifier.classify(normalFeeEvent);
+      expect(classified.ruleSeverity).toBe('INFO');
     });
   });
 
-  // ── Rule 5: Escrow Balance Drain / Unmatched Transfer ───────────────────────
-  describe('Rule 5: Escrow Balance Drain / Unmatched Transfer', () => {
-    it('POSITIVE: triggers CRITICAL alert when direct Transfer out of escrow occurs without release event', () => {
-      const ev = baseEvent('Transfer', {
-        unmatchedEscrowDrain: true,
-        from: '0xbe74923bbfd72d400a681915dbcf6e6adc72c317',
-        to: '0xattacker',
-        value: '10000000000000000000',
-      });
-      const classified = classifier.classify(ev);
+  // ── Rule 5: Unmatched Escrow Drain ──────────────────────────────────────────
+  describe('Rule 5: Unmatched Escrow Drain (ERC20 Transfer without release event in tx)', () => {
+    it('POSITIVE: flags CRITICAL when ERC20 Transfer originates from clone without release/cancel in tx', () => {
+      tracker.recordEvent(createRealEvent(factoryAddress, 'JobDeployed', {
+        jobContract: cloneAddress,
+        client: clientAddress,
+        paymentToken: '0xtoken',
+      }));
+
+      const drainTxHash = '0xdrain_tx_99999999999999999999999999999999999999999999999999999999999999';
+      const transferEvent = createRealEvent('0xtoken_contract', 'Transfer', {
+        from: cloneAddress,
+        to: unauthorizedAttacker,
+        value: 1000000000000000000n,
+      }, drainTxHash);
+
+      const classified = classifier.classify(transferEvent);
       expect(classified.ruleSeverity).toBe('CRITICAL');
       expect(classified.category).toBe('LARGE_WITHDRAWAL');
-      expect(classified.reason).toContain('Escrow drain detected');
+      expect(classified.reason).toContain('Unmatched escrow drain: ERC20 Transfer');
     });
 
-    it('NEGATIVE: normal Transfer event without drain flag classified as standard Transfer', () => {
-      const ev = baseEvent('Transfer', {
-        from: '0xuser1',
-        to: '0xuser2',
-        value: '100000000000000000',
-      });
-      const classified = classifier.classify(ev);
+    it('NEGATIVE: ERC20 Transfer in the same tx as legitimate PaymentReleased passes normally', () => {
+      tracker.recordEvent(createRealEvent(factoryAddress, 'JobDeployed', {
+        jobContract: cloneAddress,
+        client: clientAddress,
+        paymentToken: '0xtoken',
+      }));
+      tracker.recordEvent(createRealEvent(cloneAddress, 'JobFunded', {
+        amount: 1000000000000000000n,
+      }));
+      tracker.recordEvent(createRealEvent(cloneAddress, 'WorkSubmitted', {
+        title: 'Work',
+        evidenceCount: 1n,
+      }));
+
+      const releaseTxHash = '0xlegit_release_tx_111111111111111111111111111111111111111111111111111111111';
+      tracker.recordEvent(createRealEvent(cloneAddress, 'PaymentReleased', {
+        toFreelancer: 975000000000000000n,
+        fee: 25000000000000000n,
+      }, releaseTxHash));
+
+      const transferEvent = createRealEvent('0xtoken_contract', 'Transfer', {
+        from: cloneAddress,
+        to: freelancerAddress,
+        value: 975000000000000000n,
+      }, releaseTxHash);
+
+      const classified = classifier.classify(transferEvent);
       expect(classified.ruleSeverity).toBe('INFO');
       expect(classified.category).toBe('TRANSFER');
     });
   });
 
-  // ── Rule 6: Factory Role Escalation / Governance Tampering ──────────────────
-  describe('Rule 6: Factory Role Escalation', () => {
-    it('POSITIVE: triggers CRITICAL alert on unauthorized RoleGranted or RoleRevoked on JobFactory', () => {
-      const ev = baseEvent('RoleGranted', {
-        unauthorized: true,
-        role: '0x992488bd2b61d3d729f4b33b26659ecab37870584fdfaa3b4036cb56ab331895', // ARBITRATOR_ROLE
-        account: '0xattacker',
-        sender: '0xunauthorized',
+  // ── Rule 6: Factory Role Escalation ─────────────────────────────────────────
+  describe('Rule 6: Factory Role Modifications', () => {
+    it('POSITIVE: flags HIGH when RoleGranted or RoleRevoked occurs on JobFactory', () => {
+      const roleEvent = createRealEvent(factoryAddress, 'RoleGranted', {
+        role: '0x9f2df0fed2c77648de5860a4cc508cd0818c85b8b8a1ab4ceeef8d981c8956a6',
+        account: unauthorizedAttacker,
+        sender: clientAddress,
       });
-      const classified = classifier.classify(ev);
-      expect(classified.ruleSeverity).toBe('CRITICAL');
-      expect(classified.category).toBe('OWNERSHIP_CHANGE');
-      expect(classified.reason).toContain('Unauthorized factory role change');
-    });
 
-    it('NEGATIVE: authorized governance RoleGranted event does not flag unauthorized anomaly', () => {
-      const ev = baseEvent('RoleGranted', {
-        unauthorized: false,
-        role: '0x992488bd2b61d3d729f4b33b26659ecab37870584fdfaa3b4036cb56ab331895',
-        account: '0x25F6C8ed995C811E6c0ADb1D66A60830E8115e9A',
-        sender: '0xc0Af73834fc45E88664e94D98B77cde62Fc1139E',
-      });
-      const classified = classifier.classify(ev);
-      expect(classified.reason).not.toContain('Unauthorized factory role change');
+      const classified = classifier.classify(roleEvent);
+      expect(classified.ruleSeverity).toBe('HIGH');
+      expect(classified.category).toBe('GOVERNANCE');
+      expect(classified.reason).toContain('Factory role modification: RoleGranted');
     });
   });
 });

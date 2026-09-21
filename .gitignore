@@ -30,4 +30,5 @@ auditx-tenant-registry*.json
 *.sqlite
 *.sqlite3
 *.tmp
+*.log
 

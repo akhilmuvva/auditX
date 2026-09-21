@@ -5,6 +5,7 @@ import { setTimeout as sleep } from 'timers/promises';
 import { ethers } from 'ethers';
 import type { ChainEvent } from '../siem/types.js';
 import type { TenantRegistry, MonitoredAddress } from '../tenantRegistry.js';
+import { JOB_FACTORY_ABI, JOB_ESCROW_ABI } from '../contracts/polylanceArtifacts.js';
 
 export interface StreamerConfig {
   rpcUrls: string[];
@@ -23,20 +24,6 @@ export interface StreamerStatus {
   totalEventsProcessed: number;
   dedupedCount: number;
 }
-
-const JOB_FACTORY_ABI = [
-  'event JobDeployed(address indexed jobAddress, address indexed client, address indexed freelancer, uint256 budget, uint256 deadline)',
-  'function getAllJobs() external view returns (address[])',
-];
-
-const JOB_ESCROW_ABI = [
-  'event FundsDeposited(address indexed client, uint256 amount)',
-  'event MilestoneCompleted(uint256 milestoneId, uint256 amount)',
-  'event FundsReleased(address indexed recipient, uint256 amount)',
-  'event DisputeRaised(address indexed initiator, string reason)',
-  'event DisputeResolved(address indexed resolver, address recipient, uint256 amount)',
-  'event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)',
-];
 
 export class PolygonStreamer extends EventEmitter {
   private config: StreamerConfig;
@@ -229,7 +216,6 @@ export class PolygonStreamer extends EventEmitter {
       } catch (err: any) {
         console.error(`[PolygonStreamer] Block processing error: ${err.message}`);
         await sleep(3000);
-        // If provider dies, trigger reconnect
         if (!this.running) break;
         return this.connectWithFallback();
       }
@@ -258,7 +244,6 @@ export class PolygonStreamer extends EventEmitter {
       // Check transactions for watched contracts or factory deploys
       for (const tx of block.prefetchedTransactions) {
         const to = tx.to?.toLowerCase();
-        const from = tx.from?.toLowerCase();
 
         // Check if interaction with JobFactory
         if (this.config.jobFactoryAddress && to === this.config.jobFactoryAddress.toLowerCase()) {
@@ -285,14 +270,14 @@ export class PolygonStreamer extends EventEmitter {
       try {
         const parsed = factoryInterface.parseLog({ topics: log.topics as string[], data: log.data });
         if (parsed && parsed.name === 'JobDeployed') {
-          const deployedJob = parsed.args.jobAddress?.toLowerCase();
+          const deployedJob = (parsed.args.jobContract || parsed.args.jobAddress)?.toLowerCase();
           if (deployedJob) {
             this.watchedAddresses.add(deployedJob);
             this.emit('job-deployed', {
               jobAddress: deployedJob,
+              jobContract: deployedJob,
               client: parsed.args.client,
-              freelancer: parsed.args.freelancer,
-              budget: parsed.args.budget?.toString(),
+              paymentToken: parsed.args.paymentToken,
               txHash: receipt.hash,
             });
             console.log(`[PolygonStreamer] Dynamically watched new job escrow clone: ${deployedJob}`);
@@ -335,7 +320,7 @@ export class PolygonStreamer extends EventEmitter {
         contractAddress: log.address.toLowerCase(),
         txHash: receipt.hash,
         blockNumber: receipt.blockNumber,
-        eventName: this.normalizeEventName(eventName),
+        eventName: eventName,
         args: parsedArgs,
         gasUsed: Number(receipt.gasUsed),
         callValue: tx.value ? ethers.formatEther(tx.value) : '0',
@@ -347,19 +332,8 @@ export class PolygonStreamer extends EventEmitter {
     }
   }
 
-  private normalizeEventName(rawName: string): string {
-    const lower = rawName.toLowerCase();
-    if (lower.includes('fundsreleased') || lower.includes('fund-release') || lower.includes('withdraw')) return 'fund-release';
-    if (lower.includes('disputeraised') || lower.includes('dispute-trigger') || lower.includes('dispute')) return 'dispute-trigger';
-    if (lower.includes('fundsdeposited') || lower.includes('deposit')) return 'deposit';
-    if (lower.includes('milestonecompleted') || lower.includes('milestone')) return 'milestone-complete';
-    if (lower.includes('ownershiptransferred')) return 'ownership-transfer';
-    return rawName;
-  }
-
   private recordDedupe(key: string): void {
     if (this.processedLogs.size >= this.config.maxDedupeSize) {
-      // Evict oldest entries
       const iterator = this.processedLogs.values();
       for (let i = 0; i < 2000; i++) {
         const next = iterator.next();

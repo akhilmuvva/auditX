@@ -1,62 +1,147 @@
-use std::sync::Arc;
 use axum::{
     body::Body,
     http::{Request, StatusCode},
 };
+use chrono::{Duration, Utc};
+use ethers::signers::{LocalWallet, Signer};
+use ethers::utils::to_checksum;
+use siwe::Message;
+use std::str::FromStr;
+use std::sync::Arc;
 use tower::ServiceExt;
 
 use auditx_identity::{InMemoryStore, SiemIdentityContext};
 use auditx_identity_http::{create_router, AppState};
 
+async fn create_valid_signed_request(domain: &str) -> String {
+    let wallet: LocalWallet = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+        .parse()
+        .unwrap();
+    let now = Utc::now();
+    let exp = now + Duration::hours(1);
+    let checksum_addr = to_checksum(&wallet.address(), None);
+
+    let message_str = format!(
+        "{domain} wants you to sign in with your Ethereum account:\n{checksum_addr}\n\nSign in to PolyLance\n\nURI: https://{domain}\nVersion: 1\nChain ID: 137\nNonce: testnonce12345678\nIssued At: {}\nExpiration Time: {}",
+        now.to_rfc3339(),
+        exp.to_rfc3339()
+    );
+
+    let message = Message::from_str(&message_str).unwrap();
+    let message_bytes = message.eip191_bytes().unwrap();
+    let sig = wallet.sign_message(message_bytes).await.unwrap();
+    let sig_hex = format!("0x{}", hex::encode(sig.to_vec()));
+
+    serde_json::json!({
+        "message": message_str,
+        "signature": sig_hex,
+        "ip_address": "198.51.100.1",
+        "device_fingerprint": "fp-test-hardware-id",
+        "geo_hint": null
+    })
+    .to_string()
+}
+
+fn dummy_request_body() -> String {
+    serde_json::json!({
+        "message": "dummy",
+        "signature": "0x1234",
+        "ip_address": "198.51.100.1",
+        "device_fingerprint": "fp-test",
+        "geo_hint": null
+    })
+    .to_string()
+}
+
+fn create_test_context(domain: &str) -> Arc<SiemIdentityContext> {
+    Arc::new(SiemIdentityContext::new(
+        Arc::new(InMemoryStore::new()),
+        domain,
+    ))
+}
+
 #[tokio::test]
-async fn test_service_key_enforcement() {
-    let store = Arc::new(InMemoryStore::new());
-    let ctx = Arc::new(SiemIdentityContext::new(store, "polylance.app"));
-
+async fn test_missing_service_key_returns_401() {
+    let ctx = create_test_context("polylance.codes");
     let state = AppState {
-        ctx: ctx.clone(),
-        service_key: Some("test-secret-service-key-999".to_string()),
+        ctx,
+        service_key: Some("EXPECTED_SECRET_SERVICE_KEY_12345".to_string()),
     };
+    let app = create_router(state);
 
-    let sample_payload = serde_json::json!({
-        "message": "polylance.app wants you to sign in with your Ethereum account:\n0x1111111111111111111111111111111111111111\n\nSign in to PolyLance\n\nURI: https://polylance.app\nVersion: 1\nChain ID: 137\nNonce: abc12345\nIssued At: 2026-09-20T00:00:00Z",
-        "signature": "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
-        "ip_address": "198.51.100.42",
-        "device_fingerprint": "browser_fingerprint_hash_1"
-    });
-
-    // 1. Missing X-Service-Key -> 401 Unauthorized
-    let app = create_router(state.clone());
     let req = Request::builder()
-        .method("POST")
         .uri("/assess-wallet-login")
+        .method("POST")
         .header("content-type", "application/json")
-        .body(Body::from(serde_json::to_vec(&sample_payload).unwrap()))
+        .body(Body::from(dummy_request_body()))
         .unwrap();
-    let res = app.oneshot(req).await.unwrap();
-    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
 
-    // 2. Invalid X-Service-Key -> 401 Unauthorized
-    let app = create_router(state.clone());
-    let req = Request::builder()
-        .method("POST")
-        .uri("/assess-wallet-login")
-        .header("content-type", "application/json")
-        .header("X-Service-Key", "wrong-key-123")
-        .body(Body::from(serde_json::to_vec(&sample_payload).unwrap()))
-        .unwrap();
-    let res = app.oneshot(req).await.unwrap();
-    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+    let response = app.oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
 
-    // 3. Valid X-Service-Key -> Evaluates payload (returns 200/400, NOT 401)
-    let app = create_router(state.clone());
+#[tokio::test]
+async fn test_wrong_service_key_returns_401() {
+    let ctx = create_test_context("polylance.codes");
+    let state = AppState {
+        ctx,
+        service_key: Some("EXPECTED_SECRET_SERVICE_KEY_12345".to_string()),
+    };
+    let app = create_router(state);
+
     let req = Request::builder()
-        .method("POST")
         .uri("/assess-wallet-login")
+        .method("POST")
         .header("content-type", "application/json")
-        .header("X-Service-Key", "test-secret-service-key-999")
-        .body(Body::from(serde_json::to_vec(&sample_payload).unwrap()))
+        .header("x-service-key", "WRONG_INVALID_KEY")
+        .body(Body::from(dummy_request_body()))
         .unwrap();
-    let res = app.oneshot(req).await.unwrap();
-    assert_ne!(res.status(), StatusCode::UNAUTHORIZED);
+
+    let response = app.oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn test_valid_service_key_returns_200() {
+    let domain = "polylance.codes";
+    let ctx = create_test_context(domain);
+    let state = AppState {
+        ctx,
+        service_key: Some("EXPECTED_SECRET_SERVICE_KEY_12345".to_string()),
+    };
+    let app = create_router(state);
+
+    let valid_body = create_valid_signed_request(domain).await;
+
+    let req = Request::builder()
+        .uri("/assess-wallet-login")
+        .method("POST")
+        .header("content-type", "application/json")
+        .header("x-service-key", "EXPECTED_SECRET_SERVICE_KEY_12345")
+        .body(Body::from(valid_body))
+        .unwrap();
+
+    let response = app.oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn test_unset_service_key_config_fails_closed_503() {
+    let ctx = create_test_context("polylance.codes");
+    let state = AppState {
+        ctx,
+        service_key: None, // Unset service key config
+    };
+    let app = create_router(state);
+
+    let req = Request::builder()
+        .uri("/assess-wallet-login")
+        .method("POST")
+        .header("content-type", "application/json")
+        .header("x-service-key", "ANY_KEY")
+        .body(Body::from(dummy_request_body()))
+        .unwrap();
+
+    let response = app.oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
 }

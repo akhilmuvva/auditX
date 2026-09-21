@@ -42,26 +42,38 @@ pub async fn handle_assess_wallet_login(
     headers: HeaderMap,
     payload_res: Result<Json<RawLoginRequest>, JsonRejection>,
 ) -> impl IntoResponse {
-    // 1. Enforce X-Service-Key if configured (Constant-time check)
-    if let Some(ref required_key) = state.service_key {
-        let auth_header = headers.get("x-service-key").and_then(|v| v.to_str().ok());
-        let matches = match auth_header {
-            Some(key) => constant_time_eq(key.as_bytes(), required_key.as_bytes()),
-            None => false,
-        };
-
-        if !matches {
+    // 1. Fail closed: If service_key is unset or empty, reject with 503 SERVICE_UNAVAILABLE
+    let required_key = match state.service_key.as_ref() {
+        Some(k) if !k.trim().is_empty() => k,
+        _ => {
             return (
-                StatusCode::UNAUTHORIZED,
+                StatusCode::SERVICE_UNAVAILABLE,
                 Json(serde_json::json!({
-                    "error": "Unauthorized: missing or invalid X-Service-Key header",
-                    "status": "UNAUTHORIZED"
+                    "error": "Service unavailable: X-Service-Key authentication is not configured",
+                    "status": "SERVICE_UNCONFIGURED"
                 })),
             );
         }
+    };
+
+    // 2. Enforce X-Service-Key (Constant-time check)
+    let auth_header = headers.get("x-service-key").and_then(|v| v.to_str().ok());
+    let matches = match auth_header {
+        Some(key) => constant_time_eq(key.as_bytes(), required_key.as_bytes()),
+        None => false,
+    };
+
+    if !matches {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(serde_json::json!({
+                "error": "Unauthorized: missing or invalid X-Service-Key header",
+                "status": "UNAUTHORIZED"
+            })),
+        );
     }
 
-    // 2. Validate JSON body structure
+    // 3. Validate JSON body structure
     let Json(payload) = match payload_res {
         Ok(p) => p,
         Err(err) => {
@@ -75,7 +87,7 @@ pub async fn handle_assess_wallet_login(
         }
     };
 
-    // 3. Wrap entire handler in 250ms timeout to guarantee headroom under 300ms SLA
+    // 4. Wrap entire handler in 250ms timeout to guarantee headroom under 300ms SLA
     let res = timeout(
         Duration::from_millis(REQUEST_TIMEOUT_MS),
         assess_wallet_login(payload, &state.ctx),
