@@ -105,16 +105,19 @@ export class EventClassifier {
         };
       }
 
-      // 2d. Platform fee anomaly check (standard 250 bps = 2.5%)
+      // 2d. Platform fee anomaly check (dynamic per-clone configuredFeeBps)
       if (totalReleased > 0n) {
+        const expectedFeeBps = BigInt(clone?.configuredFeeBps ?? 250);
+        const lowerBound = expectedFeeBps > 10n ? expectedFeeBps - 10n : 0n;
+        const upperBound = expectedFeeBps + 10n;
         const feeRatioBps = (fee * 10000n) / totalReleased;
-        if (feeRatioBps !== 250n && (feeRatioBps < 240n || feeRatioBps > 260n)) {
+        if (feeRatioBps < lowerBound || feeRatioBps > upperBound) {
           this.tracker.recordEvent(event);
           return {
             ...event,
             category: 'GOVERNANCE',
             ruleSeverity: 'HIGH',
-            reason: `Platform fee anomaly: fee ratio ${feeRatioBps} bps deviates from configured platform fee (250 bps) on ${cAddr}`,
+            reason: `Platform fee anomaly: fee ratio ${feeRatioBps} bps deviates from configured platform fee (${expectedFeeBps} bps) on ${cAddr}`,
           };
         }
       }

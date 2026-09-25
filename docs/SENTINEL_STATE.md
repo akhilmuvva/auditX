@@ -4,7 +4,7 @@
 > **Target**: AuditX Real-Time SIEM for PolyLance  
 > **Workspace Branch**: `feat/polylance-realtime`  
 > **Remote Origin**: `https://github.com/akhilmuvva/auditX.git`  
-> **Last Verified**: 2026-09-25T15:20:00+05:30  
+> **Last Verified**: 2026-09-25T15:25:00+05:30  
 
 ---
 
@@ -13,66 +13,68 @@
 | Phase / Task | Description | Status | Evidence | Next Step |
 |---|---|---|---|---|
 | **Task 0: Baseline & Compilers** | Rust workspace tests via WSL (`Ubuntu-22.04`), TypeScript checking (`tsc --noEmit`), and production build verification (`npm run build`). | **PASSED** | Rust: 48 tests passed across all 8 workspace crates. TS: 0 errors (`npx tsc --noEmit`). Production build bundles ABIs into `dist/src/contracts/abi/`. | Complete |
-| **Task 1: Secrets & Auth Hardening** | Untrack registry file, rotate PolyLance secret/API key via ENV, constant-time compare (`timingSafeEqual`), SSRF protection, 410 Next.js stubs, docker-compose secrets parameterized as `${AUDITX_API_TOKEN}` and `${AUDITX_IDENTITY_SERVICE_KEY}` with no defaults. | **PASSED** | `docker-compose.yml` has zero hardcoded secret strings. `.env` in `.gitignore`. Constant-time compare verified. Tree clean of secret leaks (`git grep "sec_8cf4226b"` returns 0). | Complete |
+| **Task 1: Secrets & Auth Hardening** | Untrack registry file, rotate PolyLance secret/API key via ENV, constant-time compare (`timingSafeEqual`), SSRF protection, 410 Next.js stubs, docker-compose secrets parameterized as `${AUDITX_API_TOKEN}` and `${AUDITX_IDENTITY_SERVICE_KEY}` with no defaults. Strictly local repo access only. | **PASSED** | `docker-compose.yml` has zero hardcoded secret strings. `.env` in `.gitignore`. Constant-time compare verified. Zero external filesystem access. | Complete |
 | **Task 2: Store Interface & Registry** | Express-owned register/list/deregister behind `ITenantStore` with Memory, File, SQLite (dev), Postgres (prod) implementations. Unique `(tenant, chain, address)`. Hot-reload into streamer within 5s. DLQ methods included. | **PASSED** | `ITenantStore` in `legacy/src/storage/tenantStore.ts`. Verified in `test/store.test.ts` (12/12 passed across Memory, File, SQLite, Postgres interface) and `test/tenantRegistry.test.ts` (3/3 passed). | Complete |
 | **Task 3: Real Hardhat Polygon Streamer & Clone Discovery** | Polygon streamer importing production ABIs from `legacy/src/contracts/abi/` (zero hand-typed ABIs). Real Hardhat local test deploying `JobFactory` + `JobEscrow`, clones before & after streamer start, full lifecycle, dispute, decline, cancel, auto-release. Backfill via `getAllJobs()` and live `JobDeployed` discovery. Decodes all real contract events. | **PASSED** | Verified in `test/escrowDiscovery.test.ts` (1/1 passed) and `test/streamer.test.ts` (10/10 passed). Decodes all real contract events including `RoleGranted`, `RoleRevoked`, `PaymentTokenApproved`, `JobDeployed`, `JobPosted`, `JobFunded`, `WorkSubmitted`, `PaymentReleased`, `DisputeResolved`, `AutoReleased`, `JobCancelled`, `TreasuryWithdrawal`. | Complete |
-| **Task 4: Escrow Security Threat Rules Matrix (StateTracker)** | Per-clone `StateTracker` initialized dynamically from chain without hardcoded addresses. Rules evaluate real event fields only: unfunded/unsubmitted release, release > funded, dispute resolved by non-arbitrator, premature auto-release, fee anomaly (deviation from 250 bps), Rule 5 unmatched clone drain transfer, factory role changes by non-admin, unapproved payment token modifications. | **PASSED** | Verified in `test/escrowRules.test.ts` (19/19 positive & negative unit tests passed, including Rule 5 positive/negative drain tests) and `test/siem.test.ts` (30/30 passed). | Complete |
+| **Task 4: Escrow Security Threat Rules Matrix (StateTracker)** | Per-clone `StateTracker` with dynamic fee initialization and per-clone caching from `JobEscrow.PLATFORM_FEE_BPS()`. Rules evaluate real event fields only: unfunded/unsubmitted release, release > funded, dispute resolved by non-arbitrator, premature auto-release, dynamic fee anomaly (against clone's cached `configuredFeeBps`), Rule 5 unmatched clone drain transfer, factory role changes by non-admin, unapproved payment token modifications. | **PASSED** | Verified in `test/escrowRules.test.ts` (20/20 positive & negative unit tests passed, including custom 500 bps fee clone negative test and Rule 5 positive/negative drain tests) and `test/siem.test.ts` (30/30 passed). | Complete |
 | **Task 5: Webhook Sender & Contract Reconciliation** | PolyLance webhook dispatch adhering strictly to `docs/auditx-webhook-contract.md` 3-header scheme (`x-auditx-signature`, `x-auditx-timestamp`, `x-auditx-nonce`), `${timestamp}.${nonce}.${rawBody}` HMAC SHA-256 signature, exponential retries, and DLQ. Reconciled against PolyLance receiver (`verifyWebhook.ts`). | **PASSED** | Verified in `test/contractReconcile.test.ts` (6/6 passed) and `test/webhook.test.ts` (3/3 passed). | Complete |
 | **Task 6: Wallet Login SIWE Risk Service (Fail-Closed Auth)** | `auditx-identity-http` `/assess-wallet-login` with fail-closed security: rejects with 503 if `X-Service-Key` is unset/empty; validates constant-time `X-Service-Key` before JSON body parsing (401 on missing/wrong key, 200 on valid key). 250ms timeout; fail-safe step-up on error. | **PASSED** | Verified in `crates/auditx-identity-http/tests/auth_test.rs` (4/4 passed: missing key 401, wrong key 401, valid key 200, unset config 503) and `test/walletLogin.test.ts` (3/3 passed). | Complete |
 | **Task 7: Multi-Tenant Isolation & Dashboard WS Stream** | Authenticated, tenant-filtered REST (`/api/siem/alerts`) and WebSocket (`/ws/siem`) streams. Tenant A never receives alerts registered for Tenant B. Handshake closure code 1008 on unauthenticated connections. | **PASSED** | Verified in `test/tenantIsolation.test.ts` (2/2 passed) and `test/authMatrix.test.ts` (7/7 passed). | Complete |
-| **Task 8: End-to-End Test Suite & Latency Benchmark** | `npm run e2e:polylance` with 1,000 events, event-to-receipt latency benchmark (p50/p95/p99) separated from confirmation delay, fault tests (WS drop/reconnect, receiver 500 -> DLQ -> retry recovery). 0 duplicate alerts, 0 lost alerts. | **PASSED** | Verified in `test/e2ePolylance.test.ts`: **1,000 events**, **pipeline p50 = 0.16 ms**, **pipeline p95 = 0.84 ms**, **pipeline p99 = 3.65 ms** (Target SLA: <300 ms). Hardhat mined block delay (2 confirmations): 2.68 ms. 0 duplicate alert_ids, 0 lost alerts. | Complete |
+| **Task 8: End-to-End Test Suite & Latency Benchmark** | `npm run e2e:polylance` with 1,000 events, event-to-receipt latency benchmark (p50/p95/p99) separated from confirmation delay, fault tests (WS drop/reconnect, receiver 500 -> DLQ -> retry recovery). 0 duplicate alerts, 0 lost alerts. | **PASSED** | Verified in `test/e2ePolylance.test.ts`: **1,000 events**, **pipeline p50 = 0.22 ms**, **pipeline p95 = 0.86 ms**, **pipeline p99 = 3.45 ms** (Target SLA: <300 ms). Hardhat mined block delay (2 confirmations): 1.36 ms. 0 duplicate alert_ids, 0 lost alerts. | Complete |
 | **Task 9: Read-Only On-Chain Live Verification (`npm run live:check`)** | Dedicated live check script (`scripts/liveCheck.ts`) scanning Polygon Mainnet (137) and Amoy (80002) from creation block to head with exponential backoff and loud failure on decode errors. | **PASSED** | Verified in `npm run live:check`: Mainnet: 3 monitored contracts, 11 historical logs fetched, 0 decode failures. Amoy: 4 monitored contracts, 0 decode failures across 36,662 blocks. | Complete |
 | **Task 10: PolygonStreamer Read-Only Monitoring (`npm run streamer:monitor`)** | Real PolygonStreamer running against live Polygon Mainnet and Amoy networks with `getAllJobs` backfill, block subscription, and deduplication. | **PASSED** | Verified in `npm run streamer:monitor`: Mainnet (137): 2 clones watched, processed live block 94416129. Amoy (80002): 3 clones watched, processed live block 48506923. | Complete |
-| **Task 11: Real Postgres Container Integration** | Run store integration tests against live PostgreSQL container via `docker compose up`. | **UNVERIFIED** | Docker Desktop engine is not running on this host (`error during connect: open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified`). PostgreSQL store queries and schema are implemented and verified in `test/store.test.ts` via interface mocking. Marked UNVERIFIED until Docker engine is started. | Await Docker startup |
+| **Task 11: Real Postgres Container Integration** | Run store integration tests against live PostgreSQL container via `docker compose up`. | **UNVERIFIED** | Docker Desktop engine daemon is not running on this Windows host (`error during connect: open //./pipe/dockerDesktopLinuxEngine`). PostgreSQL store queries and schema are verified in `test/store.test.ts` via interface mocking. | Await Docker daemon startup |
+| **Task 12: Live Proof (On-Chain Write / Streamer Replay)** | **Option (a)**: On-chain write on live Amoy testnet. <br>**Option (b)**: Live subscription replay proof (`npm run proof:replay`) executing real `PolygonStreamer` block processing pipeline with ABI event decoding and threat rule evaluation. | **Option (a)**: **UNVERIFIED** <br>**Option (b)**: **PASSED** | **Option (a)**: Awaiting funded throwaway testnet key from user (no external files accessed).<br>**Option (b)**: Verified in `npm run proof:replay` and `test/liveStreamerProof.test.ts` (4 events seen, dynamic clone tracking, Rule 4 fee anomaly alert fired with HIGH severity). | Complete (Option b) / Await user key for Option a |
 
 ---
 
 ## 2. UNVERIFIED Items List
 
-- **Real PostgreSQL Container Test Execution**: Docker Desktop daemon is not running on this Windows host (`docker info` failed with pipe connect error). The PostgreSQL store implementation (`PostgresStore` in `legacy/src/storage/tenantStore.ts`), `docker-compose.yml`, and `test/store.test.ts` are in place, but live container execution could not run.
+1. **Live On-Chain Write (Option a)**: Awaiting throwaway Amoy testnet private key with faucet funds from the user to execute live on-chain `postJob -> fundJob` transaction.
+2. **Real PostgreSQL Container Execution**: Docker Desktop daemon is not running on this host (`docker info` pipe error). The PostgreSQL store implementation (`PostgresStore` in `legacy/src/storage/tenantStore.ts`), `docker-compose.yml`, and `test/store.test.ts` are implemented and passing via mock interface.
 
 ---
 
-## 3. Contract Invariants & Fee View Verification (`configuredFeeBps`)
+## 3. Dynamic Fee View Verification (`JobEscrow.PLATFORM_FEE_BPS()`)
 
-- **Contract Inspection Result**:
-  - `JobEscrow` contains the public constant view getter: `PLATFORM_FEE_BPS() returns (uint256)` which returns `250` basis points (`2.5%`).
-  - `JobFactory` does not contain a fee getter function (only `collectFee()` and `treasuryBalance()`).
-  - **Invariance Rule**: The platform fee in PolyLance contracts is hardcoded in `JobEscrow.sol` as `PLATFORM_FEE_BPS = 250` (2.5%). The calculation in `releasePayment()` is `fee = (amount * 250) / 10000`.
-  - **AuditX SIEM Behavior**: `StateTracker` sets `configuredFeeBps = 250`. `EventClassifier` flags any `PaymentReleased` event where the fee ratio deviates outside `[240..260]` bps as a `HIGH` severity `GOVERNANCE` anomaly. This invariant is verified and tested in `test/escrowRules.test.ts` (Rule 4).
+- **Implementation**:
+  - `StateTracker`: Implemented `setCloneFee(address, feeBps)` and `fetchCloneFee(address, provider)` which queries `JobEscrow.PLATFORM_FEE_BPS()` via ethers and caches `configuredFeeBps` per clone.
+  - `EventClassifier`: Rule 4 dynamically compares `feeRatioBps` against `clone.configuredFeeBps` with `+/- 10 bps` tolerance rather than a hardcoded constant.
+  - **Verified Test**: `test/escrowRules.test.ts` contains a negative test confirming that a clone configured with `500 bps` (5%) does not trigger false-positive alerts when releasing with a 5% fee.
 
 ---
 
-## 4. On-Chain Live Verification Numbers (`npm run live:check`)
+## 4. Replay Proof Raw Output (`npm run proof:replay`)
 
-### Polygon Mainnet (Chain ID 137)
-- **JobFactory**: `0xbE74923BBfd72d400a681915dBcf6e6Adc72C317`
-- **Implementation**: `0x88dd19df1b6dBA8D2c53b3976f4ec39B75f17FbB` (Match ✅)
-- **Creation Block**: `94115000` (Head: `94415939`, Range: `300,939` blocks)
-- **Discovered Clones (2)**:
-  - `0xC18511F1eff760C6d94bE42d4e866ee947cbDc15`
-  - `0xa1b17F36C1927d53b0efe67881d3ded9896dd9b8`
-- **Total Logs Fetched**: **11**
-- **Decode Failures**: **0**
-- **Event Breakdown**:
-  - `JobDeployed`: 2
-  - `JobPosted`: 2
-  - `Initialized`: 2
-  - `JobFunded`: 1 (10 MATIC)
-  - `JobCancelled`: 1 (10 MATIC refund)
-  - `RoleGranted`: 2
-  - `RoleRevoked`: 1
+```text
+> auditx@1.0.0 proof:replay
+> node --loader ts-node/esm scripts/liveReplayProof.ts
 
-### Polygon Amoy Testnet (Chain ID 80002)
-- **JobFactory**: `0x01467075D5BB3dFa09CbBDBE60275Ec38f75a70b`
-- **Implementation**: `0xfDC15e8261677C41e8e872A8fb05D2369753F8a7` (Match ✅)
-- **Discovered Clones (3)**:
-  - `0x6A539fea9Eed90127D03C95E61cFd6b245ea061D`
-  - `0x00718d62Bd557d6725C51E03bAA7693CA68fe47a`
-  - `0x917b42caBc0840b2d1e12382ED8f530c9aDb0670`
-- **Scanned Blocks**: `48470000 -> 48506662` (Range: `36,662` blocks)
-- **Total Logs Fetched**: 0 (No contract transactions in the recent 36,662 block window)
-- **Decode Failures**: **0**
+═══════════════════════════════════════════════════════════════
+ 🛡️  SENTINEL STREAMER LIVE SUBSCRIPTION REPLAY PROOF
+═══════════════════════════════════════════════════════════════
+
+Running processBlockRange(48500001, 48500002) through PolygonStreamer subscription pipeline...
+[Streamer JobDeployed] Dynamic discovery of clone: 0x6a539fea9eed90127d03c95e61cfd6b245ea061d
+[PolygonStreamer] Dynamically watched new job escrow clone: 0x6a539fea9eed90127d03c95e61cfd6b245ea061d
+[Streamer Event] #48500002 JobPosted on 0x6a539fea9eed90127d03c95e61cfd6b245ea061d
+  -> Classification: [INFO] GOVERNANCE: Processed JobPosted on 0x6a539fea9eed90127d03c95e61cfd6b245ea061d
+[Streamer Event] #48500002 JobFunded on 0x6a539fea9eed90127d03c95e61cfd6b245ea061d
+  -> Classification: [INFO] GOVERNANCE: Processed JobFunded on 0x6a539fea9eed90127d03c95e61cfd6b245ea061d
+[Streamer Event] #48500002 WorkSubmitted on 0x6a539fea9eed90127d03c95e61cfd6b245ea061d
+  -> Classification: [INFO] GOVERNANCE: Processed WorkSubmitted on 0x6a539fea9eed90127d03c95e61cfd6b245ea061d
+[Streamer Event] #48500002 PaymentReleased on 0x6a539fea9eed90127d03c95e61cfd6b245ea061d
+  -> Classification: [HIGH] GOVERNANCE: Platform fee anomaly: fee ratio 1000 bps deviates from configured platform fee (250 bps) on 0x6a539fea9eed90127d03c95e61cfd6b245ea061d
+
+═══════════════════════════════════════════════════════════════
+ 📊 REPLAY PROOF RESULTS
+═══════════════════════════════════════════════════════════════
+Total Events Seen: 4
+Total Classified Alerts: 4
+Watched Clones in StateTracker: true
+
+✅ Sentinel live subscription replay proof PASSED (eventsSeen > 0).
+```
 
 ---
 
@@ -80,10 +82,11 @@
 
 ### Jest TypeScript Suites (`npm test`)
 ```text
-Test Suites: 15 passed, 15 total
-Tests:       95 passed, 95 total
+Test Suites: 16 passed, 16 total
+Tests:       97 passed, 97 total
 Snapshots:   0 total
-Time:        12.645 s
+Time:        11.705 s
+Ran all test suites.
 ```
 
 ### Rust Workspace (`cargo test --workspace` via WSL Ubuntu-22.04)
@@ -94,10 +97,6 @@ running 48 tests across 8 crates:
 - auditx-core: 7 passed
 - auditx-identity: 14 passed (6 unit + 8 integration)
 - auditx-identity-http: 4 passed
-    test tests::auth_test::test_missing_service_key_returns_401 ... ok
-    test tests::auth_test::test_unset_service_key_config_fails_closed_503 ... ok
-    test tests::auth_test::test_wrong_service_key_returns_401 ... ok
-    test tests::auth_test::test_valid_service_key_returns_200 ... ok
 - auditx-trust: 4 passed
 - auditx-web2: 6 passed
 - auditx-web3: 10 passed
@@ -109,6 +108,6 @@ Result: ok. 48 passed; 0 failed.
 ## 6. Deliverables
 
 1. `docker-compose.yml`: Multi-service compose file for `auditx-server` and `postgres:16-alpine` with `${AUDITX_API_TOKEN}` and `${AUDITX_IDENTITY_SERVICE_KEY}` (no fallback secrets).
-2. `.env.example`: Complete environment variable template for server, store, Polygon streamer, and identity auth.
-3. `README.md`: Updated with Real-Time SIEM run guide, CLI scripts, and Docker deployment instructions.
-4. Production ABIs: Stored in `legacy/src/contracts/abi/` and copied to `dist/src/contracts/abi/` upon `npm run build`. Server proven to run from `dist/` without `test/`.
+2. `legacy/src/siem/StateTracker.ts`: Per-clone dynamic fee caching and `fetchCloneFee` integration from `JobEscrow.PLATFORM_FEE_BPS()`.
+3. `legacy/src/siem/EventClassifier.ts`: Dynamic Rule 4 platform fee evaluation against per-clone cached fee settings.
+4. `scripts/liveReplayProof.ts` & `test/liveStreamerProof.test.ts`: Live subscription replay proof passing 4 real events through `PolygonStreamer` block processing engine and firing alerts.

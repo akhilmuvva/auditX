@@ -264,6 +264,33 @@ describe('Phase 4: PolyLance Escrow Security Threat Rules (StateTracker + Real E
       const classified = classifier.classify(normalFeeEvent);
       expect(classified.ruleSeverity).toBe('INFO');
     });
+
+    it('NEGATIVE: a clone with a different configured fee (e.g. 500 bps / 5%) does not false-positive', () => {
+      const customClone = '0xcustom_fee_clone_500bps';
+      tracker.recordEvent(createRealEvent(factoryAddress, 'JobDeployed', {
+        jobContract: customClone,
+        client: clientAddress,
+        paymentToken: '0xtoken',
+        feeBps: 500, // 5% configured fee
+      }));
+      tracker.recordEvent(createRealEvent(customClone, 'JobFunded', {
+        amount: 1000000000000000000n,
+      }));
+      tracker.recordEvent(createRealEvent(customClone, 'WorkSubmitted', {
+        title: 'Work',
+        evidenceCount: 1n,
+      }));
+
+      // Fee is 50 / 1000 = 5% (500 bps)
+      const customFeeEvent = createRealEvent(customClone, 'PaymentReleased', {
+        toFreelancer: 950000000000000000n,
+        fee: 50000000000000000n,
+      });
+
+      const classified = classifier.classify(customFeeEvent);
+      expect(classified.ruleSeverity).toBe('INFO');
+      expect(classified.reason).toContain('Legitimate payment released');
+    });
   });
 
   // ── Rule 5: Unmatched Escrow Drain ──────────────────────────────────────────

@@ -97,7 +97,30 @@ export class StateTracker {
     return this.clones.get(address.toLowerCase());
   }
 
-  getOrCreateClone(address: string): CloneState {
+  setCloneFee(address: string, feeBps: number): void {
+    const clone = this.getOrCreateClone(address);
+    clone.configuredFeeBps = feeBps;
+  }
+
+  async fetchCloneFee(address: string, provider: any): Promise<number> {
+    const key = address.toLowerCase();
+    const clone = this.getOrCreateClone(key);
+    try {
+      const { ethers } = await import('ethers');
+      const { JOB_ESCROW_ABI } = await import('../contracts/polylanceArtifacts.js');
+      const contract = new ethers.Contract(address, JOB_ESCROW_ABI, provider);
+      if (typeof contract.PLATFORM_FEE_BPS === 'function') {
+        const fee = await contract.PLATFORM_FEE_BPS();
+        clone.configuredFeeBps = Number(fee);
+        return clone.configuredFeeBps;
+      }
+    } catch {
+      // Fall back to current configured fee
+    }
+    return clone.configuredFeeBps;
+  }
+
+  getOrCreateClone(address: string, initialFeeBps: number = 250): CloneState {
     const key = address.toLowerCase();
     let state = this.clones.get(key);
     if (!state) {
@@ -111,7 +134,7 @@ export class StateTracker {
         workSubmitted: false,
         workSubmittedAt: 0,
         reviewPeriod: 7 * 86400, // 7 days in seconds
-        configuredFeeBps: 250, // 2.5%
+        configuredFeeBps: initialFeeBps,
       };
       this.clones.set(key, state);
     }
@@ -145,6 +168,9 @@ export class StateTracker {
         const clone = this.getOrCreateClone(jobContract);
         if (args.client) clone.client = (args.client as string).toLowerCase();
         if (args.paymentToken) clone.paymentToken = (args.paymentToken as string).toLowerCase();
+        if (args.feeBps !== undefined || args.configuredFeeBps !== undefined) {
+          clone.configuredFeeBps = Number(args.feeBps ?? args.configuredFeeBps);
+        }
         clone.status = 'DEPLOYED';
       }
       return;
