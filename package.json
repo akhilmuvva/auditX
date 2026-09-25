@@ -11,6 +11,7 @@
     "test:siem": "jest --config jest.config.cjs test/siem.test.ts --verbose",
     "e2e:polylance": "jest --config jest.config.cjs test/e2ePolylance.test.ts --verbose",
     "live:check": "node --loader ts-node/esm scripts/liveCheck.ts",
-    "streamer:monitor": "node --loader ts-node/esm scripts/monitorPolygonStreamer.ts"
+    "streamer:monitor": "node --loader ts-node/esm scripts/monitorPolygonStreamer.ts",
+    "proof:amoy": "node --loader ts-node/esm scripts/liveProofAmoy.ts"
   }
 }

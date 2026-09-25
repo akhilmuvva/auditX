@@ -14,11 +14,11 @@ services:
       - PORT=3000
       - AUDITX_STORE_TYPE=postgres
       - DATABASE_URL=postgresql://auditx:auditx_secure_pass@postgres:5432/auditx_db
-      - AUDITX_API_TOKEN=prod_auditx_admin_secret_key_change_me
+      - AUDITX_API_TOKEN=${AUDITX_API_TOKEN}
       - POLYGON_RPC_URLS=https://polygon.gateway.tenderly.co,https://polygon-bor-rpc.publicnode.com
       - POLYLANCE_FACTORY_ADDRESS=0xbE74923BBfd72d400a681915dBcf6e6Adc72C317
       - AUDITX_IDENTITY_URL=http://localhost:8080
-      - AUDITX_IDENTITY_SERVICE_KEY=identity_service_secret_key_change_me
+      - AUDITX_IDENTITY_SERVICE_KEY=${AUDITX_IDENTITY_SERVICE_KEY}
     depends_on:
       postgres:
         condition: service_healthy
