@@ -1,5 +1,5 @@
-import { startServer } from '../legacy/src/server.ts';
-import { TenantRegistry } from '../legacy/src/tenantRegistry.ts';
+import { startServer } from '../legacy/src/server.js';
+import { TenantRegistry } from '../legacy/src/tenantRegistry.js';
 import { request as httpRequest } from 'http';
 import { once } from 'events';
 import WebSocket from 'ws';

@@ -14,5 +14,15 @@
       "@auditx/types": ["./types/index.ts"]
     }
   },
-  "include": ["legacy/src/**/*", "test/**/*", "types/**/*"]
+  "include": ["legacy/src/**/*", "test/**/*", "types/**/*", "scripts/**/*"],
+  "exclude": [
+    "test/AgentRegistry.test.ts",
+    "test/AuditBadgeNFT.test.ts",
+    "test/AuditJobQueue.test.ts",
+    "test/AuditRegistry.test.ts",
+    "test/ResumeRegistry.test.ts",
+    "scripts/deploy.ts",
+    "scripts/deploySubgraph.ts",
+    "scripts/startAgent.ts"
+  ]
 }

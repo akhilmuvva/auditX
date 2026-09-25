@@ -4,9 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "tsc --project legacy/tsconfig.json && node -e \"const fs = require('fs'); fs.mkdirSync('dist/src/contracts/abi', { recursive: true }); fs.cpSync('legacy/src/contracts/abi', 'dist/src/contracts/abi', { recursive: true }); fs.mkdirSync('legacy/dist/src/contracts/abi', { recursive: true }); fs.cpSync('legacy/src/contracts/abi', 'legacy/dist/src/contracts/abi', { recursive: true });\"",
+    "start": "node legacy/dist/src/cli.js server",
     "test": "jest --config jest.config.cjs",
     "test:contracts": "npx hardhat test",
     "test:siem": "jest --config jest.config.cjs test/siem.test.ts --verbose",
-    "e2e:polylance": "jest --config jest.config.cjs test/e2ePolylance.test.ts --verbose"
+    "e2e:polylance": "jest --config jest.config.cjs test/e2ePolylance.test.ts --verbose",
+    "live:check": "node --loader ts-node/esm scripts/liveCheck.ts",
+    "streamer:monitor": "node --loader ts-node/esm scripts/monitorPolygonStreamer.ts"
   }
 }

@@ -179,14 +179,52 @@ export class EventClassifier {
       };
     }
 
-    // ── Rule 5: Factory Role Modifications ──────────────────────────────────
+    // ── Rule 5: Factory Role Modifications & Payment Token Approvals ────────────────
     if (eName === 'RoleGranted' || eName === 'RoleRevoked') {
+      const sender = String(args.sender || event.from || '').toLowerCase();
+      const account = String(args.account || '').toLowerCase();
+      const role = String(args.role || '');
+
+      if (!this.tracker.hasAdmin(sender)) {
+        this.tracker.recordEvent(event);
+        return {
+          ...event,
+          category: 'GOVERNANCE',
+          ruleSeverity: 'CRITICAL',
+          reason: `Unauthorized factory role modification: ${eName} role ${role} for account ${account} by non-admin ${sender}`,
+        };
+      }
+
       this.tracker.recordEvent(event);
       return {
         ...event,
         category: 'GOVERNANCE',
-        ruleSeverity: 'HIGH',
-        reason: `Factory role modification: ${eName} role ${args.role} for account ${args.account} by ${args.sender || event.from}`,
+        ruleSeverity: 'INFO',
+        reason: `Authorized factory role modification: ${eName} role ${role} for account ${account} by admin ${sender}`,
+      };
+    }
+
+    if (eName === 'PaymentTokenApproved') {
+      const sender = String(args.sender || event.from || '').toLowerCase();
+      const token = String(args.token || args.paymentToken || '').toLowerCase();
+      const approved = Boolean(args.approved);
+
+      if (!this.tracker.hasAdmin(sender)) {
+        this.tracker.recordEvent(event);
+        return {
+          ...event,
+          category: 'GOVERNANCE',
+          ruleSeverity: 'CRITICAL',
+          reason: `Unauthorized payment token modification: token ${token} approved=${approved} by non-admin ${sender}`,
+        };
+      }
+
+      this.tracker.recordEvent(event);
+      return {
+        ...event,
+        category: 'GOVERNANCE',
+        ruleSeverity: 'INFO',
+        reason: `Authorized payment token modification: token ${token} approved=${approved} by admin ${sender}`,
       };
     }
 

@@ -250,9 +250,14 @@ describe('Phase 3: Real Hardhat Integration Test — Factory Clones & JobEscrow 
     const txAuto = await job5.connect(freelancer).claimAutoRelease();
     parseLogs(await txAuto.wait());
 
-    // ── 9. Flow F: Factory Treasury & Roles ──────────────────────────────────
+    // ── 9. Flow F: Factory Treasury, Tokens & Roles ──────────────────────────
+    const txApprove = await jobFactory.setApprovedPaymentToken(usdtAddress, true);
+    parseLogs(await txApprove.wait());
+
     const TREASURY_ADMIN_ROLE = await jobFactory.TREASURY_ADMIN_ROLE();
-    await (await jobFactory.grantRole(TREASURY_ADMIN_ROLE, deployer.address)).wait();
+    const txGrant = await jobFactory.grantRole(TREASURY_ADMIN_ROLE, deployer.address);
+    parseLogs(await txGrant.wait());
+
     const txWith = await jobFactory.withdrawTreasury(usdtAddress, deployer.address, (hre as any).ethers.parseEther('1'));
     parseLogs(await txWith.wait());
 
@@ -260,7 +265,7 @@ describe('Phase 3: Real Hardhat Integration Test — Factory Clones & JobEscrow 
     const txRev = await jobFactory.revokeRole(ARBITRATOR_ROLE, judge.address);
     parseLogs(await txRev.wait());
 
-    // ── 10. Assert All 18+ Real Events Decoded from Real On-Chain Logs ────────
+    // ── 10. Assert All Real Events Decoded from Real On-Chain Logs ────────
     const EXPECTED_REAL_EVENTS = [
       'JobDeployed',
       'JobPosted',
@@ -282,7 +287,9 @@ describe('Phase 3: Real Hardhat Integration Test — Factory Clones & JobEscrow 
       'CancelConsentGiven',
       'JobCancelled',
       'AutoReleased',
+      'RoleGranted',
       'RoleRevoked',
+      'PaymentTokenApproved',
       'TreasuryWithdrawal',
     ];
 

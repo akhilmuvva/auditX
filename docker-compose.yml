@@ -1,27 +1,51 @@
 version: '3.8'
 
 services:
-  auditx-engine:
-    build: .
-    ports:
-      - "3000:3000"
-    environment:
-      - ANTHROPIC_API_KEY=\${ANTHROPIC_API_KEY}
-      - PRIVATE_KEY=\${PRIVATE_KEY}
-      - RPC_URL=\${RPC_URL}
-    volumes:
-      - ./contracts:/app/contracts
-      - ./auditx-reports:/app/auditx-reports
-    restart: unless-stopped
-
-  dashboard:
+  auditx-server:
     build:
       context: .
       dockerfile: Dockerfile
-    command: sh -c "cd dashboard && npm run dev -- --host 0.0.0.0"
+    container_name: auditx-siem-server
+    restart: unless-stopped
     ports:
-      - "5173:5173"
-    volumes:
-      - ./dashboard/src:/app/dashboard/src
+      - "3000:3000"
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=production
+      - PORT=3000
+      - AUDITX_STORE_TYPE=postgres
+      - DATABASE_URL=postgresql://auditx:auditx_secure_pass@postgres:5432/auditx_db
+      - AUDITX_API_TOKEN=prod_auditx_admin_secret_key_change_me
+      - POLYGON_RPC_URLS=https://polygon.gateway.tenderly.co,https://polygon-bor-rpc.publicnode.com
+      - POLYLANCE_FACTORY_ADDRESS=0xbE74923BBfd72d400a681915dBcf6e6Adc72C317
+      - AUDITX_IDENTITY_URL=http://localhost:8080
+      - AUDITX_IDENTITY_SERVICE_KEY=identity_service_secret_key_change_me
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/siem/baseline"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: auditx-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=auditx
+      - POSTGRES_PASSWORD=auditx_secure_pass
+      - POSTGRES_DB=auditx_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auditx -d auditx_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

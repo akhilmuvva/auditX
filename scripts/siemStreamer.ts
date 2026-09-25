@@ -91,11 +91,11 @@ class SIEMAutomationStreamer {
       try {
         console.log(`📦 New Block Minted: #${blockNumber}`);
         const block = await this.provider.getBlock(blockNumber, true);
-        if (!block || !block.prefixedTransactions) return;
+        if (!block || !block.prefetchedTransactions) return;
 
         const events: ChainEvent[] = [];
 
-        for (const tx of block.prefixedTransactions) {
+        for (const tx of block.prefetchedTransactions) {
           // Skip if tx.to is null (contract deployment)
           if (!tx.to) continue;
 

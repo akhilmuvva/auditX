@@ -166,8 +166,12 @@ export class PolygonStreamer extends EventEmitter {
         // Backfill jobs if Factory is configured
         await this.backfillFactoryJobs();
 
-        // Start polling / block subscription
-        await this.listenBlocks(currentBlock);
+        // Start polling / block subscription in background
+        this.listenBlocks(currentBlock).catch((err: any) => {
+          if (this.running) {
+            console.error(`[PolygonStreamer] Background listener error: ${err.message}`);
+          }
+        });
         return;
       } catch (err: any) {
         console.warn(`[PolygonStreamer] RPC ${url} failed: ${err.message}. Rotating...`);

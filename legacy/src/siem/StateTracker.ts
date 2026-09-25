@@ -2,7 +2,8 @@
  * AuditX SIEM — StateTracker
  *
  * Maintains on-chain state per JobEscrow clone and JobFactory.
- * State is updated strictly from verified on-chain events and optional view calls.
+ * State is initialized dynamically from on-chain events and verified RPC replays.
+ * No hardcoded addresses.
  */
 
 import type { ChainEvent } from './types.js';
@@ -28,15 +29,32 @@ export class StateTracker {
   private approvedPaymentTokens = new Set<string>();
   private txEventNames = new Map<string, Set<string>>(); // txHash -> Set of eventNames in that tx
 
-  constructor() {
-    // Default known PolyLance on-chain role addresses from bundle
-    this.adminAddresses.add('0xc0Af73834fc45E88664e94D98B77cde62Fc1139E'.toLowerCase());
-    this.adminAddresses.add('0x2BfAAE968b81C1817647498660088F74e1B4cAE3'.toLowerCase());
-    this.arbitratorAddresses.add('0x25F6C8ed995C811E6c0ADb1D66A60830E8115e9A'.toLowerCase());
-    this.arbitratorAddresses.add('0x62cDfc0692cC675c95304BaCE2C834D8F901dCba'.toLowerCase());
-    this.arbitratorAddresses.add('0xB8aa0398B91A150B041DA819bc954Bb356e009Dd'.toLowerCase());
-    this.factoryAddresses.add('0xbE74923BBfd72d400a681915dBcf6e6Adc72C317'.toLowerCase());
-    this.factoryAddresses.add('0x01467075D5BB3dFa09CbBDBE60275Ec38f75a70b'.toLowerCase());
+  constructor(
+    initialAdmins: string[] = [],
+    initialArbitrators: string[] = [],
+    initialFactories: string[] = []
+  ) {
+    for (const a of initialAdmins) this.adminAddresses.add(a.toLowerCase());
+    for (const a of initialArbitrators) this.arbitratorAddresses.add(a.toLowerCase());
+    for (const f of initialFactories) this.factoryAddresses.add(f.toLowerCase());
+
+    const envFactories = (process.env.POLYLANCE_FACTORY_ADDRESSES || process.env.POLYLANCE_FACTORY_ADDRESS || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    for (const f of envFactories) this.factoryAddresses.add(f.toLowerCase());
+
+    const envAdmins = (process.env.POLYLANCE_ADMIN_ADDRESSES || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    for (const a of envAdmins) this.adminAddresses.add(a.toLowerCase());
+
+    const envArbitrators = (process.env.POLYLANCE_ARBITRATOR_ADDRESSES || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    for (const a of envArbitrators) this.arbitratorAddresses.add(a.toLowerCase());
   }
 
   addFactoryAddress(address: string): void {
@@ -136,8 +154,11 @@ export class StateTracker {
       const account = (args.account as string)?.toLowerCase();
       const role = String(args.role || '');
       if (account) {
-        // ARBITRATOR_ROLE hash: 0x9f2df0fed2c77648de5860a4cc508cd0818c85b8b8a1ab4ceeef8d981c8956a6 or standard
-        if (role.includes('ARBITRATOR') || role.startsWith('0x9f2df0fed2c77648de5860a4cc508cd0818c85b8b8a1ab4ceeef8d981c8956a6')) {
+        if (
+          role.includes('ARBITRATOR') ||
+          role.startsWith('0x9f2df0fed2c77648de5860a4cc508cd0818c85b8b8a1ab4ceeef8d981c8956a6') ||
+          role.startsWith('0x16ceee8289685dd2a02b9c8ae81d2df373176ce53519e6284e2a2950d6546ffa')
+        ) {
           this.addArbitrator(account);
         } else {
           this.addAdmin(account);
@@ -150,7 +171,11 @@ export class StateTracker {
       const account = (args.account as string)?.toLowerCase();
       const role = String(args.role || '');
       if (account) {
-        if (role.includes('ARBITRATOR') || role.startsWith('0x9f2df0fed2c77648de5860a4cc508cd0818c85b8b8a1ab4ceeef8d981c8956a6')) {
+        if (
+          role.includes('ARBITRATOR') ||
+          role.startsWith('0x9f2df0fed2c77648de5860a4cc508cd0818c85b8b8a1ab4ceeef8d981c8956a6') ||
+          role.startsWith('0x16ceee8289685dd2a02b9c8ae81d2df373176ce53519e6284e2a2950d6546ffa')
+        ) {
           this.removeArbitrator(account);
         } else {
           this.removeAdmin(account);

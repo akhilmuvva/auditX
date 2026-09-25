@@ -130,10 +130,55 @@ Copy and paste this markdown/HTML badge directly into your repository's README t
 
 ---
 
+## Real-Time SIEM & PolyLance Escrow Monitor
+
+AuditX includes a production real-time SIEM engine tailored for decentralized escrows (such as PolyLance).
+
+### Key Features
+- **Contract Threat Rules Matrix (StateTracker)**: Zero synthetic fields; all invariants evaluated directly from verified EVM events (`PaymentReleased`, `DisputeResolved`, `AutoReleased`, `RoleGranted`, `RoleRevoked`, `PaymentTokenApproved`, `Transfer`).
+- **PolygonStreamer**: Live block polling and WSS subscriptions with automatic deduplication, confirmation lag, and reorg detection.
+- **Fail-Closed Identity SIWE Service**: Constant-time `X-Service-Key` verification rejecting unconfigured services with HTTP 503 and unauthorized requests with HTTP 401.
+- **PolyLance Webhook Dispatcher**: Signed HMAC SHA-256 webhooks adhering to the 3-header scheme (`x-auditx-signature`, `x-auditx-timestamp`, `x-auditx-nonce`) with exponential retry backoff and Dead Letter Queue (DLQ).
+
+### CLI Scripts & Verification
+
+```bash
+# 1. Run Complete TypeScript Test Suite (Unit + Integration + Discovery + E2E)
+npm test
+
+# 2. Run High-Scale 1,000+ Event Benchmark with Fault Injection
+npm run e2e:polylance
+
+# 3. Live On-Chain Verification (Scans Polygon Mainnet 137 & Amoy 80002)
+npm run live:check
+
+# 4. Run Live Polygon Streamer in Read-Only Mode
+npm run streamer:monitor
+```
+
+### Docker Deployment
+
+```bash
+# 1. Configure environment
+cp .env.example .env
+
+# 2. Build and start services (AuditX Server + PostgreSQL)
+docker compose up --build -d
+
+# 3. Check container logs
+docker compose logs -f auditx-server
+```
+
+---
+
 ## Deployed Registry Contracts
 
 | Network | Contract / Interface | Address |
 |---|---|---|
 | Base Sepolia | EAS Attestation Registrar | `0x4200000000000000000000000000000000000021` |
 | Base Sepolia | AuditBadgeNFT (ERC-721) | `0x5FbDB2315678afecb367f032d93F642f64180aa3` |
-| Polygon | PaymentReceiver (USDC) | `0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512` |
+| Polygon Mainnet (137) | PolyLance JobFactory | `0xbE74923BBfd72d400a681915dBcf6e6Adc72C317` |
+| Polygon Mainnet (137) | JobEscrow Master Implementation | `0x88dd19df1b6dBA8D2c53b3976f4ec39B75f17FbB` |
+| Polygon Amoy (80002) | PolyLance JobFactory | `0x01467075D5BB3dFa09CbBDBE60275Ec38f75a70b` |
+| Polygon Amoy (80002) | JobEscrow Master Implementation | `0xfDC15e8261677C41e8e872A8fb05D2369753F8a7` |
+

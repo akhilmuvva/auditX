@@ -16,6 +16,7 @@ describe('Phase 4: PolyLance Escrow Security Threat Rules (StateTracker + Real E
   beforeEach(() => {
     tracker = new StateTracker();
     tracker.addFactoryAddress(factoryAddress);
+    tracker.addArbitrator(authorizedJudge);
     classifier = new EventClassifier(tracker);
   });
 
@@ -319,19 +320,117 @@ describe('Phase 4: PolyLance Escrow Security Threat Rules (StateTracker + Real E
     });
   });
 
-  // ── Rule 6: Factory Role Escalation ─────────────────────────────────────────
-  describe('Rule 6: Factory Role Modifications', () => {
-    it('POSITIVE: flags HIGH when RoleGranted or RoleRevoked occurs on JobFactory', () => {
+  // ── Rule 6: Factory Role Escalation & Token Modification ─────────────────────
+  describe('Rule 6: Factory Role Modifications & Payment Token Approvals', () => {
+    it('POSITIVE: flags CRITICAL when RoleGranted occurs by a non-admin', () => {
       const roleEvent = createRealEvent(factoryAddress, 'RoleGranted', {
         role: '0x9f2df0fed2c77648de5860a4cc508cd0818c85b8b8a1ab4ceeef8d981c8956a6',
         account: unauthorizedAttacker,
-        sender: clientAddress,
+        sender: unauthorizedAttacker,
       });
 
       const classified = classifier.classify(roleEvent);
-      expect(classified.ruleSeverity).toBe('HIGH');
+      expect(classified.ruleSeverity).toBe('CRITICAL');
       expect(classified.category).toBe('GOVERNANCE');
-      expect(classified.reason).toContain('Factory role modification: RoleGranted');
+      expect(classified.reason).toContain('Unauthorized factory role modification');
+    });
+
+    it('NEGATIVE: passes with INFO when RoleGranted occurs by an authorized admin', () => {
+      const adminAddress = '0x1111111111111111111111111111111111111111';
+      tracker.addAdmin(adminAddress);
+
+      const roleEvent = createRealEvent(factoryAddress, 'RoleGranted', {
+        role: '0x9f2df0fed2c77648de5860a4cc508cd0818c85b8b8a1ab4ceeef8d981c8956a6',
+        account: authorizedJudge,
+        sender: adminAddress,
+      });
+
+      const classified = classifier.classify(roleEvent);
+      expect(classified.ruleSeverity).toBe('INFO');
+      expect(classified.category).toBe('GOVERNANCE');
+      expect(tracker.hasArbitrator(authorizedJudge)).toBe(true);
+    });
+
+    it('POSITIVE: flags CRITICAL when PaymentTokenApproved occurs by a non-admin', () => {
+      const tokenEvent = createRealEvent(factoryAddress, 'PaymentTokenApproved', {
+        token: '0xmalicious_token',
+        approved: true,
+        sender: unauthorizedAttacker,
+      });
+
+      const classified = classifier.classify(tokenEvent);
+      expect(classified.ruleSeverity).toBe('CRITICAL');
+      expect(classified.category).toBe('GOVERNANCE');
+      expect(classified.reason).toContain('Unauthorized payment token modification');
+    });
+
+    it('NEGATIVE: passes with INFO when PaymentTokenApproved occurs by an authorized admin', () => {
+      const adminAddress = '0x1111111111111111111111111111111111111111';
+      tracker.addAdmin(adminAddress);
+
+      const tokenEvent = createRealEvent(factoryAddress, 'PaymentTokenApproved', {
+        token: '0xvalid_usdt_token',
+        approved: true,
+        sender: adminAddress,
+      });
+
+      const classified = classifier.classify(tokenEvent);
+      expect(classified.ruleSeverity).toBe('INFO');
+      expect(classified.category).toBe('GOVERNANCE');
+    });
+  });
+
+  // ── State Initialization & Dynamic Replay ──────────────────────────────────
+  describe('State Initialization: Startup Replay & Release Invariants', () => {
+    it('start streamer AFTER funded job exists -> replay -> release payment -> asserts NO alert', () => {
+      const dynamicTracker = new StateTracker();
+      const dynamicClassifier = new EventClassifier(dynamicTracker);
+
+      // Replay pre-existing on-chain state on startup
+      dynamicTracker.recordEvent(createRealEvent(factoryAddress, 'JobDeployed', {
+        jobContract: cloneAddress,
+        client: clientAddress,
+        paymentToken: '0xtoken',
+      }));
+      dynamicTracker.recordEvent(createRealEvent(cloneAddress, 'JobFunded', {
+        amount: 1000000000000000000n,
+      }));
+      dynamicTracker.recordEvent(createRealEvent(cloneAddress, 'WorkSubmitted', {
+        title: 'Complete SIEM Deliverable',
+        evidenceCount: 1n,
+      }));
+
+      // Streamer starts and receives PaymentReleased
+      const releaseEvent = createRealEvent(cloneAddress, 'PaymentReleased', {
+        toFreelancer: 975000000000000000n,
+        fee: 25000000000000000n,
+      });
+
+      const classified = dynamicClassifier.classify(releaseEvent);
+      expect(classified.ruleSeverity).toBe('INFO');
+      expect(classified.reason).toContain('Legitimate payment released');
+    });
+
+    it('release on an unfunded real clone DOES alert with CRITICAL', () => {
+      const dynamicTracker = new StateTracker();
+      const dynamicClassifier = new EventClassifier(dynamicTracker);
+
+      dynamicTracker.recordEvent(createRealEvent(factoryAddress, 'JobDeployed', {
+        jobContract: cloneAddress,
+        client: clientAddress,
+        paymentToken: '0xtoken',
+      }));
+
+      // PaymentReleased on unfunded clone
+      const releaseEvent = createRealEvent(cloneAddress, 'PaymentReleased', {
+        toFreelancer: 975000000000000000n,
+        fee: 25000000000000000n,
+      });
+
+      const classified = dynamicClassifier.classify(releaseEvent);
+      expect(classified.ruleSeverity).toBe('CRITICAL');
+      expect(classified.reason).toContain('PaymentReleased on unfunded escrow clone');
     });
   });
 });
+
