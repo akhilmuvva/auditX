@@ -99,18 +99,13 @@ async function main() {
   const ipfsHash = `QmSentinelLiveProof_${Date.now()}`;
   console.log(`3. Sending on-chain transaction: postJob('${ipfsHash}', address(0))...`);
 
-  const feeData = await provider.getFeeData();
-  const maxPriorityFee = feeData.maxPriorityFeePerGas && feeData.maxPriorityFeePerGas > ethers.parseUnits('25', 'gwei')
-    ? feeData.maxPriorityFeePerGas
-    : ethers.parseUnits('30', 'gwei');
-  const maxFee = feeData.maxFeePerGas && feeData.maxFeePerGas > ethers.parseUnits('30', 'gwei')
-    ? feeData.maxFeePerGas
-    : ethers.parseUnits('35', 'gwei');
+  const maxPriorityFee = ethers.parseUnits('30', 'gwei');
+  const maxFee = ethers.parseUnits('40', 'gwei');
 
   const tx = await factory.postJob(ipfsHash, ethers.ZeroAddress, {
     maxPriorityFeePerGas: maxPriorityFee,
     maxFeePerGas: maxFee,
-    gasLimit: 300000,
+    gasLimit: 400000,
   });
 
   console.log(`   Tx Broadcasted: ${tx.hash}`);
