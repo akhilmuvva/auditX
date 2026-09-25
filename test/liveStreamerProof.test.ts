@@ -193,11 +193,11 @@ describe('Phase 8b: Real PolygonStreamer Subscription Pipeline Replay & Rule Eva
     await (streamer as any).processBlockRange(48500001, 48500002);
 
     // Assertions
-    expect(eventsSeen.length).toBe(4);
-    expect(classifiedAlerts.length).toBe(4);
+    expect(eventsSeen.length).toBe(5);
+    expect(classifiedAlerts.length).toBe(5);
 
     const eventNames = eventsSeen.map((e) => e.eventName);
-    expect(eventNames).toEqual(['JobPosted', 'JobFunded', 'WorkSubmitted', 'PaymentReleased']);
+    expect(eventNames).toEqual(['JobDeployed', 'JobPosted', 'JobFunded', 'WorkSubmitted', 'PaymentReleased']);
 
     // Check that clone was dynamically registered
     expect(tracker.isClone(cloneAddress)).toBe(true);

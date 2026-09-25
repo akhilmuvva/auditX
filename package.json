@@ -12,6 +12,7 @@
     "e2e:polylance": "jest --config jest.config.cjs test/e2ePolylance.test.ts --verbose",
     "live:check": "node --loader ts-node/esm scripts/liveCheck.ts",
     "streamer:monitor": "node --loader ts-node/esm scripts/monitorPolygonStreamer.ts",
-    "proof:replay": "node --loader ts-node/esm scripts/liveReplayProof.ts"
+    "proof:replay": "node --loader ts-node/esm scripts/liveReplayProof.ts",
+    "proof:onchain": "node --loader ts-node/esm scripts/liveOnChainProof.ts"
   }
 }

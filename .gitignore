@@ -21,8 +21,10 @@ dist/
 
 # Env files
 .env
+.env*
 .env.local
 .env.production
+.env.amoy-proof
 
 # Tenant registries & persistence
 auditx-tenant-registry*.json

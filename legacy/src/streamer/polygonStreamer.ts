@@ -284,6 +284,27 @@ export class PolygonStreamer extends EventEmitter {
               paymentToken: parsed.args.paymentToken,
               txHash: receipt.hash,
             });
+
+            const dedupeKey = `${receipt.hash}:${log.index}`;
+            if (!this.processedLogs.has(dedupeKey)) {
+              this.recordDedupe(dedupeKey);
+              const chainEvent: ChainEvent = {
+                id: `ev-${receipt.hash}-${log.index}`,
+                timestamp: Date.now(),
+                chainId: 80002,
+                contractAddress: log.address.toLowerCase(),
+                txHash: receipt.hash,
+                blockNumber: receipt.blockNumber,
+                eventName: 'JobDeployed',
+                args: parsed.args.toObject ? parsed.args.toObject() : { ...parsed.args },
+                gasUsed: Number(receipt.gasUsed),
+                callValue: '0',
+                from: receipt.from ? receipt.from.toLowerCase() : '',
+              };
+              this.totalEventsProcessed++;
+              this.emit('event', chainEvent);
+            }
+
             console.log(`[PolygonStreamer] Dynamically watched new job escrow clone: ${deployedJob}`);
           }
         }
