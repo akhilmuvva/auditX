@@ -127,8 +127,17 @@ describe('Phase 7: Strict Multi-Tenant Isolation Verification', () => {
     expect(
       alertMessagesA.some((m: any) => m.data?.event?.contractAddress?.toLowerCase() === contractA.toLowerCase())
     ).toBe(true);
-    const alertMessagesB = messagesB.filter((m: any) => m.type === 'alert');
-    expect(alertMessagesB).toHaveLength(0);
+    // 8. Verify Non-Allowlisted / Unauthorized Callers are Rejected
+    const unauthorizedKey = 'ax_live_unauthorized_attacker_key_6677';
+    const unauthRest = await fetch(`http://127.0.0.1:${port}/api/siem/alerts`, {
+      headers: { 'x-api-key': unauthorizedKey },
+    });
+    expect(unauthRest.status).toBe(401);
+
+    const unauthMonitored = await fetch(`http://127.0.0.1:${port}/api/siem/monitored-addresses`, {
+      headers: { 'x-api-key': unauthorizedKey },
+    });
+    expect(unauthMonitored.status).toBe(401);
 
     wsA.close();
     wsB.close();

@@ -50,6 +50,26 @@ export class TenantRegistry extends EventEmitter {
     this.initSync();
   }
 
+  private loadEnvAllowlist(): void {
+    const rawKeys = process.env.AUDITX_ADMIN_API_KEYS;
+    if (rawKeys) {
+      const keys = rawKeys.split(',').map((k) => k.trim()).filter(Boolean);
+      for (const key of keys) {
+        const hash = TenantRegistry.hashApiKey(key);
+        if (!this.syncCache.clients.some((c) => c.apiKeyHash === hash)) {
+          this.syncCache.clients.push({
+            id: `admin-${hash.slice(0, 8)}`,
+            name: 'PolyLance_Admin',
+            webhookUrl: process.env.POLYLANCE_WEBHOOK_URL || 'https://polylance.codes/api/webhooks/auditx-alert',
+            apiKeyHash: hash,
+            hmacSecret: process.env.AUDITX_WEBHOOK_SECRET || 'sec_static_admin_polylance',
+            createdAt: new Date().toISOString(),
+          });
+        }
+      }
+    }
+  }
+
   private initSync(): void {
     if (this.store.listClientsSync && this.store.listAllMonitoredAddressesSync) {
       this.syncCache = {
@@ -57,12 +77,14 @@ export class TenantRegistry extends EventEmitter {
         monitored: this.store.listAllMonitoredAddressesSync(),
       };
     }
+    this.loadEnvAllowlist();
   }
 
   async refreshCache(): Promise<void> {
     const clients = await this.store.listClients();
     const monitored = await this.store.listAllMonitoredAddresses();
     this.syncCache = { clients, monitored };
+    this.loadEnvAllowlist();
     this.emit('change', this.syncCache);
     this.emit('monitored-changed', monitored);
   }

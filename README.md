@@ -136,6 +136,7 @@ AuditX includes a production real-time SIEM engine tailored for decentralized es
 
 ### Key Features
 - **Contract Threat Rules Matrix (StateTracker)**: Zero synthetic fields; all invariants evaluated directly from verified EVM events (`PaymentReleased`, `DisputeResolved`, `AutoReleased`, `RoleGranted`, `RoleRevoked`, `PaymentTokenApproved`, `Transfer`).
+- **Static PolyLance Admin Allowlist**: Replaces open self-registration with a hardened static allowlist configured via `AUDITX_API_TOKEN` and `AUDITX_ADMIN_API_KEYS`.
 - **PolygonStreamer**: Live block polling and WSS subscriptions with automatic deduplication, confirmation lag, and reorg detection.
 - **Fail-Closed Identity SIWE Service**: Constant-time `X-Service-Key` verification rejecting unconfigured services with HTTP 503 and unauthorized requests with HTTP 401.
 - **PolyLance Webhook Dispatcher**: Signed HMAC SHA-256 webhooks adhering to the 3-header scheme (`x-auditx-signature`, `x-auditx-timestamp`, `x-auditx-nonce`) with exponential retry backoff and Dead Letter Queue (DLQ).
@@ -143,7 +144,7 @@ AuditX includes a production real-time SIEM engine tailored for decentralized es
 ### CLI Scripts & Verification
 
 ```bash
-# 1. Run Complete TypeScript Test Suite (Unit + Integration + Discovery + E2E)
+# 1. Run Complete TypeScript Test Suite (Unit + Integration + Discovery + E2E + Mainnet Proof)
 npm test
 
 # 2. Run High-Scale 1,000+ Event Benchmark with Fault Injection
@@ -152,7 +153,10 @@ npm run e2e:polylance
 # 3. Live On-Chain Verification (Scans Polygon Mainnet 137 & Amoy 80002)
 npm run live:check
 
-# 4. Run Live Polygon Streamer in Read-Only Mode
+# 4. Real Mainnet Historical Event Replay & Rule Evaluation Proof
+npm run proof:mainnet
+
+# 5. Run Live Polygon Streamer in Read-Only Mode
 npm run streamer:monitor
 ```
 

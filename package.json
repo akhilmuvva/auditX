@@ -14,6 +14,7 @@
     "streamer:monitor": "node --loader ts-node/esm scripts/monitorPolygonStreamer.ts",
     "proof:replay": "node --loader ts-node/esm scripts/liveReplayProof.ts",
     "proof:onchain": "node --loader ts-node/esm scripts/liveOnChainProof.ts",
+    "proof:mainnet": "node --loader ts-node/esm scripts/mainnetLiveReplayProof.ts",
     "sweep:amoy": "node --loader ts-node/esm scripts/sweepBalance.ts"
   }
 }

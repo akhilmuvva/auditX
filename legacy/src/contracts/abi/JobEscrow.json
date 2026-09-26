@@ -187,7 +187,7 @@
     "anonymous": false,
     "inputs": [
       {
-        "indexed": false,
+        "indexed": true,
         "internalType": "address",
         "name": "client",
         "type": "address"
@@ -199,7 +199,7 @@
         "type": "string"
       },
       {
-        "indexed": false,
+        "indexed": true,
         "internalType": "address",
         "name": "paymentToken",
         "type": "address"

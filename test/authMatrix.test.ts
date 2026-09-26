@@ -57,13 +57,14 @@ async function testWs(port: number, protocol: string | null): Promise<number> {
   });
 }
 
-describe('Express REST & WebSocket Auth Verification Matrix', () => {
-  it('measures status codes for every endpoint across no-token, invalid-token, and valid-token', async () => {
+describe('Express REST & WebSocket Auth Verification Matrix (Static Admin Allowlist)', () => {
+  it('measures status codes across no-token, invalid-token, allowlisted-admin-token, and non-allowlisted callers', async () => {
     const tempPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'auditx-auth-')), 'reg.json');
+    const allowlistedAdminKey = 'ax_live_polylance_admin_static_secret_9988';
     process.env.AUDITX_API_TOKEN = 'test-admin-token-12345';
+    process.env.AUDITX_ADMIN_API_KEYS = allowlistedAdminKey;
     process.env.AUDITX_REGISTRY_PATH = tempPath;
     const registry = new TenantRegistry(tempPath);
-    const issued = registry.registerClient('PolyLance', 'https://polylance.codes/api/webhooks/auditx-alert');
     const server = startServer(0, registry);
     servers.push(server);
     if (!server.listening) await once(server, 'listening');
@@ -77,6 +78,7 @@ describe('Express REST & WebSocket Auth Verification Matrix', () => {
       { name: 'POST /api/siem/ingest', method: 'POST', path: '/api/siem/ingest', body: { events: [{ id: '1', timestamp: Date.now(), chainId: 137, contractAddress: '0x0000000000000000000000000000000000000001', txHash: '0x1', blockNumber: 1, eventName: 'test', args: {}, gasUsed: 100, callValue: '0', from: '0x1' }] } },
       { name: 'POST /api/siem/clients', method: 'POST', path: '/api/siem/clients', body: { name: 'TestApp', webhook_url: 'https://test.com/hook' } },
       { name: 'POST /api/siem/monitored-addresses', method: 'POST', path: '/api/siem/monitored-addresses', body: { address: '0x00000000000000000000000000000000000000aa', chain: 'polygon', watch_config: ['fund-release'] } },
+      { name: 'POST /api/monitor/register', method: 'POST', path: '/api/monitor/register', body: { address: '0x00000000000000000000000000000000000000aa' } },
     ];
 
     for (const ep of endpoints) {
@@ -84,24 +86,24 @@ describe('Express REST & WebSocket Auth Verification Matrix', () => {
       const noToken = await req(port, ep.method, ep.path, {}, ep.body);
       // 2. Wrong token
       const wrongToken = await req(port, ep.method, ep.path, { authorization: 'Bearer wrong-token-xyz' }, ep.body);
-      // 3. Valid Admin token
+      // 3. Valid Master Admin token
       const adminToken = await req(port, ep.method, ep.path, { authorization: 'Bearer test-admin-token-12345' }, ep.body);
-      // 4. Valid Client API Key
-      const clientKey = await req(port, ep.method, ep.path, { 'x-api-key': issued.apiKey }, ep.body);
+      // 4. Allowlisted Admin API Key
+      const allowlistedKey = await req(port, ep.method, ep.path, { 'x-api-key': allowlistedAdminKey }, ep.body);
 
       results.push({
         endpoint: ep.name,
         noToken: noToken.status,
         wrongToken: wrongToken.status,
         validAdmin: adminToken.status,
-        validApiKey: clientKey.status,
+        allowlistedApiKey: allowlistedKey.status,
       });
     }
 
     // WS /ws/siem
     const wsNoToken = await testWs(port, null);
     const wsWrongToken = await testWs(port, 'auditx-api-key.invalid_key');
-    const wsValidKey = await testWs(port, `auditx-api-key.${issued.apiKey}`);
+    const wsValidKey = await testWs(port, `auditx-api-key.${allowlistedAdminKey}`);
 
     console.log('=== AUTH VERIFICATION MATRIX ===');
     console.table(results);
@@ -110,19 +112,27 @@ describe('Express REST & WebSocket Auth Verification Matrix', () => {
 
     // Assertions
     for (const r of results) {
-      expect(r.noToken).toBe(401);
-      expect(r.wrongToken).toBe(401);
-      if (r.endpoint === 'POST /api/siem/clients') {
-        expect(r.validAdmin).toBe(201);
-        expect(r.validApiKey).toBe(403); // /clients route strictly requires Admin token
-      } else if (r.endpoint === 'POST /api/siem/ingest') {
-        expect(r.validAdmin).toBe(200);
-        expect(r.validApiKey).toBe(200);
-      } else if (r.endpoint === 'POST /api/siem/monitored-addresses') {
-        expect(r.validApiKey).toBe(201);
+      if (r.endpoint === 'POST /api/monitor/register') {
+        // Removed endpoint returns 404 (or 401 unauthed)
+        expect([401, 404]).toContain(r.noToken);
+        expect([401, 404]).toContain(r.wrongToken);
+        expect(r.validAdmin).toBe(404);
+        expect(r.allowlistedApiKey).toBe(404);
+      } else if (r.endpoint === 'POST /api/siem/clients') {
+        // Client self-registration is disabled for all callers
+        expect(r.noToken).toBe(401);
+        expect(r.wrongToken).toBe(401);
+        expect(r.validAdmin).toBe(403);
+        expect(r.allowlistedApiKey).toBe(403);
       } else {
-        expect(r.validAdmin).toBe(200);
-        expect(r.validApiKey).toBe(200);
+        expect(r.noToken).toBe(401);
+        expect(r.wrongToken).toBe(401);
+        if (r.endpoint === 'POST /api/siem/monitored-addresses') {
+          expect(r.allowlistedApiKey).toBe(201);
+        } else {
+          expect(r.validAdmin).toBe(200);
+          expect(r.allowlistedApiKey).toBe(200);
+        }
       }
     }
     expect(wsNoToken).toBe(1008);

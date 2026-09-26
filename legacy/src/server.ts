@@ -248,26 +248,8 @@ export function startServer(port: number = 3000, registry?: TenantRegistry) {
   app.use('/api/siem', requireApiAccess);
 
   app.post('/api/siem/clients', (req, res) => {
-    if (!constantTimeEquals(req.headers.authorization, `Bearer ${process.env.AUDITX_API_TOKEN}`)) {
-      res.status(403).json({ error: 'Admin authorization required.' });
-      return;
-    }
-    const { name, webhook_url: webhookUrl } = req.body as { name?: string; webhook_url?: string };
-    if (!name || !webhookUrl) {
-      res.status(400).json({ error: 'name and webhook_url are required' });
-      return;
-    }
-    let credentials: IssuedClientCredentials;
-    try {
-      credentials = tenantRegistry.registerClient(name, webhookUrl);
-    } catch (error) {
-      res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid client registration' });
-      return;
-    }
-    res.status(201).json({
-      client: credentials.client,
-      api_key: credentials.apiKey,
-      hmac_secret: credentials.hmacSecret,
+    res.status(403).json({
+      error: 'Client self-registration is disabled. AuditX operates on a static PolyLance admin allowlist configured via environment variables (AUDITX_API_TOKEN / AUDITX_ADMIN_API_KEYS).',
     });
   });
 
@@ -325,34 +307,6 @@ export function startServer(port: number = 3000, registry?: TenantRegistry) {
       res.json({ ok: true, message: `Deregistered ${target}` });
     } catch (error) {
       res.status(401).json({ error: error instanceof Error ? error.message : 'Invalid API key' });
-    }
-  });
-
-  // Alias for backward compatibility with PolyLance client registration
-  app.post('/api/monitor/register', requireApiAccess, (req, res) => {
-    const apiKey = (typeof req.headers['x-api-key'] === 'string' ? req.headers['x-api-key'] : '')
-      || (typeof req.body?.api_key === 'string' ? req.body.api_key : '');
-    const { address, chain, watch_config: watchConfig } = req.body as {
-      address?: string; chain?: string; watch_config?: string[];
-    };
-    if (!apiKey || !address) {
-      res.status(400).json({ error: 'api_key and address are required' });
-      return;
-    }
-    try {
-      const monitored = tenantRegistry.registerMonitoredAddress(
-        apiKey,
-        address,
-        chain || 'polygon',
-        watchConfig || ['fund-release', 'dispute-trigger'],
-      );
-      res.status(201).json({
-        status: 'SUCCESS',
-        message: 'Address registered successfully for real-time SIEM monitoring',
-        registration: monitored,
-      });
-    } catch (error) {
-      res.status(400).json({ error: error instanceof Error ? error.message : 'Failed to register monitored address' });
     }
   });
 
